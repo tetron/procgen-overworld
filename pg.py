@@ -1,4 +1,5 @@
 import random
+import PIL.Image
 
 pf = .2
 
@@ -233,28 +234,15 @@ def procgen():
     for x in range(0, 256):
         tilemap.append(['.'] * 256)
 
-    # for y,row in enumerate(basemap):
-    #     for x,tile in enumerate(row):
-    #         if tile > .527:
-    #             tilemap[x][y] = 'M'
-    #         elif tile > .5012:
-    #             tilemap[x][y] = '#'
-    #     print("")
-
-    tilemap[5][4] = "#"
-    tilemap[5][6] = "M"
-
-    #tilemap = remove_tiles(tilemap)
-    #tilemap = expand_tiles(tilemap, "M", ["*", "."])
-    #tilemap = expand_tiles(tilemap, "*", ["."])
-
-    print("Before")
-    for y,row in enumerate(tilemap):
+    for y,row in enumerate(basemap):
         for x,tile in enumerate(row):
-            print(tilemap[y][x], end='')
+            if tile > .527:
+                tilemap[x][y] = 'M'
+            elif tile > .501:
+                tilemap[x][y] = '#'
         print("")
 
-    #tilemap = apply_filter(tilemap, eliminate_islands, [])
+    tilemap = apply_filter(tilemap, eliminate_islands, [])
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
     tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
 
@@ -263,5 +251,23 @@ def procgen():
         for x,tile in enumerate(row):
             print(tilemap[y][x], end='')
         print("")
+
+    img = PIL.Image.new("RGB", (256, 256))
+
+    sea = (101, 183, 255)
+    land = (52, 176, 0)
+    mountains = (255, 255, 255)
+
+    for y,row in enumerate(tilemap):
+        for x,tile in enumerate(row):
+            if tilemap[y][x] == ".":
+                img.putpixel((x, y), sea)
+            if tilemap[y][x] == "#":
+                img.putpixel((x, y), land)
+            if tilemap[y][x] == "M":
+                img.putpixel((x, y), mountains)
+
+    img.save("map.png")
+
 
 procgen()
