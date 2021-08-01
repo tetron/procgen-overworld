@@ -1,17 +1,13 @@
 import random
+import math
 import PIL.Image
 
-pf = .2
+perturb_reduction = .5
+minimum_rect = 16
+map_size = 128
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
-    if abs(x0 - x1) <= 1 and abs(y0 - y1) <= 1:
-        if x0 == x1 or y0 == y1:
-            return
-        # the x0, y0 and x1, y1 corners are already set
-        # need to set the x0, y1, and x1, y0 corners
-        midp = (basemap[y0][x0]+basemap[y1][x1])/2.0
-        basemap[y0][x1] = midp + random.uniform(-r0, r0)
-        basemap[y1][x0] = midp + random.uniform(-r0, r0)
+    if abs(x0 - x1) <= minimum_rect and abs(y0 - y1) <= minimum_rect:
         return
 
     if x0+1 == x1-1:
@@ -34,79 +30,91 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
         n = int((y1-y0)/4)
         y2 = random.randint(y0+n, y1-n)
 
-    #x2 = int((x1+x0)/2)
-    #y2 = int((y1+y0)/2)
-
-    if basemap[y2][x2] != .5:
-        return
-
     #print(basemap[y0][x0],basemap[y1][x0],basemap[y0][x1],basemap[y1][x1])
     midp = (basemap[y0][x0]+basemap[y1][x0]+basemap[y0][x1]+basemap[y1][x1])/4.0
     basemap[y2][x2] = midp + random.uniform(-r0, r0)
-    #print(x0, y0, x1, y1, x2, y2, midp, basemap[y2][x2], r0)
+    #print((x0, y0), (x1, y1), (x2, y2), basemap[y2][x2], r0)
 
-    perturb_point(basemap, x0, y0, x2, y2, r0*pf)
-    perturb_point(basemap, x2, y0, x1, y2, r0*pf)
-    perturb_point(basemap, x0, y2, x2, y1, r0*pf)
-    perturb_point(basemap, x2, y2, x1, y1, r0*pf)
+    r0 *= perturb_reduction
+    perturb_point(basemap, x0, y0, x2, y2, r0)
+    perturb_point(basemap, x2, y0, x1, y2, r0)
+    perturb_point(basemap, x0, y2, x2, y1, r0)
+    perturb_point(basemap, x2, y2, x1, y1, r0)
+
+def clamp(n):
+    return min(max(n, 0), map_size-1)
+
+def nearby_point(basemap, x, y, a, b, points):
+    a = clamp(a)
+    b = clamp(b)
+    if basemap[b][a] == 0:
+        return
+    if len(points) < 3:
+        points.append((a, b))
+    else:
+        dist = math.sqrt((a-x)*(a-x) + (b-y)*(b-y))
+        for i in range(0, 3):
+            px = points[i][0]
+            py = points[i][1]
+            pdist = math.sqrt((px-x)*(px-x) + (py-y)*(py-y))
+            if dist < pdist:
+                points.insert(i, (a, b))
+                break
+        if len(points) > 3:
+            points.pop()
 
 
-def remove_tiles(tilemap):
-    newtilemap = []
-    for x in range(0, 256):
-        newtilemap.append(['.'] * 256)
+def nearest_three_points(basemap, x, y):
+    points = []
+    n = 0
+    if basemap[y][x] != 0:
+        return points
+    while n < map_size:
+        n += 1
+        for i in range(-n, n):
+            nearby_point(basemap, x, y, x+i, y-n, points)
+            nearby_point(basemap, x, y, x+n, y+i, points)
+            nearby_point(basemap, x, y, x-i, y+n, points)
+            nearby_point(basemap, x, y, x-n, y-i, points)
+        if len(points) == 3:
+            break
+    return points
 
-    for y,row in enumerate(tilemap):
+
+def interpolate_height(basemap, x, y):
+    points = nearest_three_points(basemap, x, y)
+    if len(points) == 0:
+        return basemap[y][x]
+
+    pdist = []
+    for i in range(0, len(points)):
+        p = points[i]
+        pdist.append(math.sqrt((x-p[0])*(x-p[0]) + (y-p[1])*(y-p[1])))
+    sdist = sum(pdist)
+    interp = 0
+    weights = []
+    for i in range(0, len(points)):
+        weights.append((sdist-pdist[i])/sdist)
+    wsum = sum(weights)
+
+    for i in range(0, len(points)):
+        p = points[i]
+        weight = weights[i]/wsum
+        #print(weight, basemap[p[1]][p[0]])
+        interp += weight * basemap[p[1]][p[0]]
+    return interp
+
+
+def interpolate_heights(basemap):
+    newbasemap = []
+    for x in range(0, map_size):
+        newbasemap.append([0] * map_size)
+
+    for y,row in enumerate(basemap):
+        print(y)
         for x,tile in enumerate(row):
-            newtilemap[y][x] = tilemap[y][x]
-
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            if tile == '#':
-                if (newtilemap[y-1][x-1] == '.' and
-                    newtilemap[y-1][x] == '.' and
-                    newtilemap[y-1][x+1] == '.' and
-                    newtilemap[y][x-1] == '.' and
-                    newtilemap[y][x+1] == '.' and
-                    newtilemap[y+1][x-1] == '.' and
-                    newtilemap[y+1][x] == '.' and
-                    newtilemap[y+1][x+1] == '.'):
-                    newtilemap[y][x] = '.'
-
-    return newtilemap
-
-def expand_tiles(tilemap, expand, repl):
-    newtilemap = []
-    for x in range(0, 256):
-        newtilemap.append(['.'] * 256)
-
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            newtilemap[y][x] = tilemap[y][x]
-
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            if tile == expand:
-                if newtilemap[y-1][x-1] in repl:
-                    newtilemap[y-1][x-1] = expand
-                if newtilemap[y-1][x] in repl:
-                    newtilemap[y-1][x] = expand
-                if newtilemap[y-1][x+1] in repl:
-                    newtilemap[y-1][x+1] = expand
-
-                if newtilemap[y][x-1] in repl:
-                    newtilemap[y][x-1] = expand
-                if newtilemap[y][x+1] in repl:
-                    newtilemap[y][x+1] = expand
-
-                if newtilemap[y+1][x-1] in repl:
-                    newtilemap[y+1][x-1] = expand
-                if newtilemap[y+1][x] in repl:
-                    newtilemap[y+1][x] = expand
-                if newtilemap[y+1][x+1] in repl:
-                    newtilemap[y+1][x+1] = expand
-
-    return newtilemap
+            newbasemap[y][x] = interpolate_height(basemap, x, y)
+    return newbasemap
 
 eliminate_islands = [
     ["..."
@@ -198,14 +206,14 @@ def check_rule(tilemap, rule, x, y, multi):
 
 def apply_filter(tilemap, rules, multi):
     newtilemap = []
-    for x in range(0, 256):
-        newtilemap.append(['.'] * 256)
+    for x in range(0, map_size):
+        newtilemap.append(['.'] * map_size)
 
     for y,row in enumerate(tilemap):
-        if y == 0 or y == 255:
+        if y == 0 or y == (map_size-1):
             continue
         for x,tile in enumerate(row):
-            if x == 0 or x == 255:
+            if x == 0 or x == (map_size-1):
                 continue
             rep = tilemap[y][x]
             for rule in rules:
@@ -220,39 +228,71 @@ def apply_filter(tilemap, rules, multi):
 
 def procgen():
     basemap = []
-    for x in range(0, 256):
-        basemap.append([.5] * 256)
+    for x in range(0, map_size):
+        basemap.append([0] * map_size)
 
-    basemap[127][127] = 1
+    for i in range(0, map_size):
+        basemap[0][i] = -1
+        basemap[map_size-1][i] = -1
+        basemap[i][0] = -1
+        basemap[i][map_size-1] = -1
 
-    perturb_point(basemap, 5, 5, 127, 127, .5)
-    perturb_point(basemap, 127, 127, 250, 250, .5)
-    perturb_point(basemap, 5, 127, 127, 250, .5)
-    perturb_point(basemap, 127, 5, 250, 127, .5)
+    perturb_point(basemap, 5, 5, map_size-5, map_size-5, 2)
+
+    print(nearest_three_points(basemap, 30, 30))
+    #print(nearest_three_points(basemap, 31, 31))
+    #print(nearest_three_points(basemap, 32, 32))
+    #print(nearest_three_points(basemap, 33, 33))
 
     tilemap = []
-    for x in range(0, 256):
-        tilemap.append(['.'] * 256)
+    for x in range(0, map_size):
+        tilemap.append(['.'] * map_size)
+
+    basemap = interpolate_heights(basemap)
+
+    heightmin = 100
+    heightmax = -100
+    avg = 0
 
     for y,row in enumerate(basemap):
         for x,tile in enumerate(row):
-            if tile > .527:
-                tilemap[x][y] = 'M'
-            elif tile > .501:
-                tilemap[x][y] = '#'
-        print("")
+            if basemap[y][x] < heightmin:
+                heightmin = basemap[y][x]
+            if basemap[y][x] > heightmax:
+                heightmax = basemap[y][x]
+            avg += basemap[y][x]
+
+    avg = avg / (map_size*map_size)
+
+    #mountain_elevation = heightmin + (heightmax-heightmin)*.9
+    #mountain_elevation = avg + (heightmax-avg)*.6
+    #sea_elevation = heightmin + (heightmax-heightmin)*.6
+    #sea_elevation = avg + (heightmax-avg)*.3
+
+    print("avg", avg)
+    mountain_elevation = avg + .4
+    sea_elevation = avg+.2
+
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if tile > mountain_elevation:
+                tilemap[y][x] = 'M'
+            elif tile > sea_elevation:
+                tilemap[y][x] = '#'
+            else:
+                tilemap[y][x] = '.'
 
     tilemap = apply_filter(tilemap, eliminate_islands, [])
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
-    tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
+    # tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
+    # tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
 
-    print("After")
     for y,row in enumerate(tilemap):
         for x,tile in enumerate(row):
             print(tilemap[y][x], end='')
         print("")
 
-    img = PIL.Image.new("RGB", (256, 256))
+    img = PIL.Image.new("RGB", (map_size, map_size))
 
     sea = (101, 183, 255)
     land = (52, 176, 0)
