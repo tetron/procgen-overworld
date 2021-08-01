@@ -4,7 +4,7 @@ import PIL.Image
 
 perturb_reduction = .5
 minimum_rect = 16
-map_size = 128
+map_size = 256
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
     if abs(x0 - x1) <= minimum_rect and abs(y0 - y1) <= minimum_rect:
@@ -239,11 +239,6 @@ def procgen():
 
     perturb_point(basemap, 5, 5, map_size-5, map_size-5, 2)
 
-    print(nearest_three_points(basemap, 30, 30))
-    #print(nearest_three_points(basemap, 31, 31))
-    #print(nearest_three_points(basemap, 32, 32))
-    #print(nearest_three_points(basemap, 33, 33))
-
     tilemap = []
     for x in range(0, map_size):
         tilemap.append(['.'] * map_size)
@@ -264,23 +259,24 @@ def procgen():
 
     avg = avg / (map_size*map_size)
 
-    #mountain_elevation = heightmin + (heightmax-heightmin)*.9
-    #mountain_elevation = avg + (heightmax-avg)*.6
-    #sea_elevation = heightmin + (heightmax-heightmin)*.6
-    #sea_elevation = avg + (heightmax-avg)*.3
-
-    print("avg", avg)
-    mountain_elevation = avg + .4
+    mountain_elevation = avg + .46
     sea_elevation = avg+.2
 
-    for y,row in enumerate(basemap):
-        for x,tile in enumerate(row):
-            if tile > mountain_elevation:
-                tilemap[y][x] = 'M'
-            elif tile > sea_elevation:
-                tilemap[y][x] = '#'
-            else:
-                tilemap[y][x] = '.'
+    mountain_count = 0
+    land_count = 0
+    while mountain_count < (map_size*map_size)*.05:
+        mountain_count = 0
+        mountain_elevation -= .01
+        for y,row in enumerate(basemap):
+            for x,tile in enumerate(row):
+                if tile > mountain_elevation:
+                    tilemap[y][x] = 'M'
+                    mountain_count += 1
+                elif tile > sea_elevation:
+                    tilemap[y][x] = '#'
+                    land_count += 1
+                else:
+                    tilemap[y][x] = '.'
 
     tilemap = apply_filter(tilemap, eliminate_islands, [])
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
