@@ -2,13 +2,15 @@ import random
 import math
 import PIL.Image
 
-perturb_reduction = 0
-minimum_rect = 16
-map_size = 128
-land_pct = .2
-mountain_pct = 0.00
+perturb_reduction = .60
+minimum_rect = 1
+map_size = 256
+land_pct = .15
+mountain_pct = 0.03
+midp_rand = 0
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
+    #print((x0, y0), (x1, y1), (abs(x0 - x1), abs(y0 - y1)), r0)
     if abs(x0 - x1) <= minimum_rect and abs(y0 - y1) <= minimum_rect:
         return
 
@@ -19,8 +21,13 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
     elif x0+1 == x1:
         x2 = x0
     else:
-        n = int((x1-x0)/4)
+        n = int((x1-x0) * (1-midp_rand) * .5)
+        if n == 0:
+            n = 1
         x2 = random.randint(x0+n, x1-n)
+
+    # (37, 11) (37, 14) (0, 3) 2.4308653429145085e-63
+    # (37, 11)
 
     if y0+1 == y1-1:
         y2 = y0+1
@@ -29,11 +36,15 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
     elif y0+1 == y1:
         y2 = y0
     else:
-        n = int((y1-y0)/4)
+        n = int((y1-y0) * (1-midp_rand) * .5)
+        if n == 0:
+            n = 1
         y2 = random.randint(y0+n, y1-n)
 
-    x2 = int((x0+x1)/2)
-    y2 = int((y0+y1)/2)
+    #print((x2, y2))
+
+    #x2 = int((x0+x1)/2)
+    #y2 = int((y0+y1)/2)
 
     # middle
     if basemap[y2][x2] is None:
@@ -61,6 +72,7 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
         basemap[y1][x2] = midp4 + random.uniform(-r0, r0)
 
     r0 *= perturb_reduction
+    #print("pp0", (x0, y0, x2, y2), (x2, y0, x1, y2), (x0, y2, x2, y1), (x2, y2, x1, y1))
     perturb_point(basemap, x0, y0, x2, y2, r0)
     perturb_point(basemap, x2, y0, x1, y2, r0)
     perturb_point(basemap, x0, y2, x2, y1, r0)
@@ -143,9 +155,37 @@ def interpolate_heights(basemap):
     return newbasemap
 
 eliminate_islands = [
-    ["..."
+    ["_.."
      ".#."
      "...",
+     "."],
+    ["._."
+     ".#."
+     "...",
+     "."],
+    [".._"
+     ".#."
+     "...",
+     "."],
+    ["..."
+     "_#."
+     "...",
+     "."],
+    ["..."
+     ".#_"
+     "...",
+     "."],
+    ["..."
+     ".#."
+     "_..",
+     "."],
+    ["..."
+     ".#."
+     "._.",
+     "."],
+    ["..."
+     ".#."
+     ".._",
      "."],
     ["..."
      ".M."
@@ -153,12 +193,6 @@ eliminate_islands = [
      "."],
     ["___"
      "_M_"
-     "___",
-     "#"]]
-
-eliminate_ponds = [
-    ["___"
-     "_._"
      "___",
      "#"]]
 
@@ -198,36 +232,20 @@ expand_mountains = [
 ]
 
 expand_shores = [
+    ["###"
+     "_._"
+     "___",
+     "#"],
     ["#__"
-     "_.."
-     "_..",
-     "#"],
-    ["_#_"
-     "..."
-     "...",
-     "#"],
-    ["__#"
-     ".._"
-     ".._",
-     "#"],
-    ["_.."
-     "#.."
-     "_..",
-     "#"],
-    [".._"
-     "..#"
-     ".._",
-     "#"],
-    ["_.."
-     "_.."
+     "#._"
      "#__",
      "#"],
-    ["..."
-     "..."
-     "_#_",
+    ["___"
+     "_._"
+     "###",
      "#"],
-    [".._"
-     ".._"
+    ["__#"
+     "_.#"
      "__#",
      "#"]
 ]
@@ -278,10 +296,9 @@ def procgen():
             basemap[map_size-1-b][i] = 0
             basemap[i][b] = 0
             basemap[i][map_size-1-b] = 0
+    basemap[int(map_size/2)-1][int(map_size/2)-1] = 0
 
-    basemap[int(map_size/2)-1][int(map_size/2)-1] = 1
-
-    perturb_point(basemap, border, border, map_size-1-border, map_size-1-border, 0)
+    perturb_point(basemap, border, border, map_size-1-border, map_size-1-border, 1)
 
     tilemap = []
     for x in range(0, map_size):
@@ -291,21 +308,21 @@ def procgen():
     #print(nearest_three_points(basemap, 62, 62), interpolate_height(basemap, 62, 62))
     #return
 
-    basemap = interpolate_heights(basemap)
+    #basemap = interpolate_heights(basemap)
 
-    heightmin = 100
-    heightmax = -100
-    avg = 0
+    # heightmin = 100
+    # heightmax = -100
+    # avg = 0
 
-    for y,row in enumerate(basemap):
-        for x,tile in enumerate(row):
-            if basemap[y][x] < heightmin:
-                heightmin = basemap[y][x]
-            if basemap[y][x] > heightmax:
-                heightmax = basemap[y][x]
-            avg += basemap[y][x]
+    # for y,row in enumerate(basemap):
+    #     for x,tile in enumerate(row):
+    #         if basemap[y][x] < heightmin:
+    #             heightmin = basemap[y][x]
+    #         if basemap[y][x] > heightmax:
+    #             heightmax = basemap[y][x]
+    #         avg += basemap[y][x]
 
-    avg = avg / (map_size*map_size)
+    # avg = avg / (map_size*map_size)
 
     mountain_elevation = 1-mountain_pct
     sea_elevation = 1-land_pct
@@ -337,22 +354,23 @@ def procgen():
             sea_elevation -= .005
         if mountain_count < min_mtn_tiles:
             mountain_elevation -= .005
+        if sea_elevation <= 0:
+            return False
 
     print("sea_elevation", sea_elevation)
     print("mountain_elevation", mountain_elevation)
 
     print("Lowering iterations", lowering_iter)
 
-    #tilemap = apply_filter(tilemap, eliminate_islands, ["#", "."])
-    #tilemap = apply_filter(tilemap, eliminate_ponds, ["#", "M"])
-    #tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
+    tilemap = apply_filter(tilemap, eliminate_islands, ["#", "."])
+    tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
     # tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
-    # tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
+    tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
 
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            print(tilemap[y][x], end='')
-        print("")
+    # for y,row in enumerate(tilemap):
+    #     for x,tile in enumerate(row):
+    #         print(tilemap[y][x], end='')
+    #     print("")
 
     img = PIL.Image.new("RGB", (map_size, map_size))
 
@@ -371,5 +389,9 @@ def procgen():
 
     img.save("map.png")
 
+    return True
 
-procgen()
+
+success = procgen()
+while success is False:
+    success = procgen()
