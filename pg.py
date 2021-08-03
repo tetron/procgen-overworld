@@ -303,21 +303,12 @@ def apply_filter(tilemap, rules, multi, repeat):
 
     return tilemap
 
-def savemap(tilemap, filename):
+def savemap(tilemap, colormap, filename):
     img = PIL.Image.new("RGB", (map_size, map_size))
-
-    sea = (101, 183, 255)
-    land = (52, 176, 0)
-    mountains = (255, 255, 255)
 
     for y,row in enumerate(tilemap):
         for x,tile in enumerate(row):
-            if tilemap[y][x] == ".":
-                img.putpixel((x, y), sea)
-            if tilemap[y][x] == "#":
-                img.putpixel((x, y), land)
-            if tilemap[y][x] == "M":
-                img.putpixel((x, y), mountains)
+            img.putpixel((x, y), colormap[tilemap[y][x]])
 
     img.save(filename)
 
@@ -374,6 +365,11 @@ def find_regions(tilemap):
     print(regionlist)
     print(connections)
 
+    colormap = {}
+    for i,_ in enumerate(regionlist):
+        colormap[i] = (random.randint(5, 250), random.randint(5, 250), random.randint(5, 250))
+
+    savemap(regionmap, colormap, "map6.png")
 
 def procgen():
     basemap = []
@@ -458,7 +454,11 @@ def procgen():
     tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
     tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
 
-    savemap(tilemap, "map5.png")
+    colormap = {".": (101, 183, 255),
+                "#": (52, 176, 0),
+                "M": (255, 255, 255)}
+
+    savemap(tilemap, colormap, "map5.png")
 
     find_regions(tilemap)
 
