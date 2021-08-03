@@ -120,40 +120,6 @@ def nearest_three_points(basemap, x, y):
     return points
 
 
-def interpolate_height(basemap, x, y):
-    p = nearest_three_points(basemap, x, y)
-    if len(p) == 0:
-        return basemap[y][x]
-
-    # https://codeplea.com/triangular-interpolation
-    #print(x, y, p)
-    #print((p[1][1]-p[2][1])*(p[0][0]-p[2][0]))
-    #print((p[2][0]-p[1][0])*(p[0][1]-p[2][1]))
-    interp = 0
-    divisor = (p[1][1]-p[2][1])*(p[0][0]-p[2][0]) + (p[2][0]-p[1][0])*(p[0][1]-p[2][1])
-    if divisor != 0:
-        w0 = ((p[1][1]-p[2][1])*(x-p[2][0]) + (p[2][0]-p[1][0])*(y-p[2][1])) / divisor
-        w1 = ((p[2][1]-p[0][1])*(x-p[2][0]) + (p[0][0]-p[2][0])*(y-p[2][1])) / divisor
-        w2 = 1 - w0 - w1
-
-        interp += w0 * basemap[p[0][1]][p[0][0]]
-        interp += w1 * basemap[p[1][1]][p[1][0]]
-        interp += w2 * basemap[p[2][1]][p[2][0]]
-
-    return interp
-
-
-def interpolate_heights(basemap):
-    newbasemap = []
-    for x in range(0, map_size):
-        newbasemap.append([0] * map_size)
-
-    for y,row in enumerate(basemap):
-        print(y)
-        for x,tile in enumerate(row):
-            newbasemap[y][x] = interpolate_height(basemap, x, y)
-    return newbasemap
-
 eliminate_tiny_islands = [
     ["_.."
      ".#."
@@ -264,6 +230,48 @@ expand_shores = [
      "#"]
 ]
 
+expand_sea = [
+    [".__"
+     "___"
+     "___",
+     "."],
+    ["_._"
+     "___"
+     "___",
+     "."],
+    ["__."
+     "___"
+     "___",
+     "."],
+    ["___"
+     ".__"
+     "___",
+     "."],
+    ["___"
+     "__."
+     "___",
+     "."],
+    ["___"
+     "___"
+     ".__",
+     "."],
+    ["___"
+     "___"
+     "_._",
+     "."],
+    ["___"
+     "___"
+     "__.",
+     "."]
+]
+
+fix_lakes = [
+    ["_=_"
+     "=_="
+     "_=_",
+     "="],
+]
+
 def check_rule(tilemap, rule, x, y, multi):
     for j in range(0, 3):
         for i in range(0, 3):
@@ -319,13 +327,20 @@ def printmap(tilemap):
             print(tilemap[y][x], end='')
         print("")
 
+class Region:
+    def __init__(self, tile):
+        self.tile = tile
+        self.points = []
+        self.adjacent = set()
+
+    def __repr__(self):
+        return "<'%s' %s %s>" % (self.tile, self.points, self.adjacent)
 
 def find_regions(tilemap):
     regionmap = []
     for x in range(0, map_size):
         regionmap.append([None] * map_size)
-    connections = {}
-    regionlist = ['.']
+    regionlist = [Region('.')]
 
     working_stack = [(0, 0, 0)]
     pending = []
@@ -338,6 +353,7 @@ def find_regions(tilemap):
                 continue
 
             regionmap[y][x] = current_region
+            regionlist[current_region].points.append((x, y))
             curtile = tilemap[y][x]
 
             adjacent = [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
@@ -352,24 +368,45 @@ def find_regions(tilemap):
         while pending and not working_stack:
             x, y, current_region = pending.pop(0)
             if regionmap[y][x] is None:
-                regionlist.append(tilemap[y][x])
+                regionlist.append(Region(tilemap[y][x]))
                 next_region = len(regionlist)-1
                 working_stack.append((x, y, next_region))
             elif regionmap[y][x] != current_region:
                 next_region = regionmap[y][x]
-            connections.setdefault(current_region, set()).add(next_region)
-            connections.setdefault(next_region, set()).add(current_region)
+            regionlist[current_region].adjacent.add(next_region)
+            regionlist[next_region].adjacent.add(current_region)
 
 
     printmap(regionmap)
     print(regionlist)
-    print(connections)
 
     colormap = {}
     for i,_ in enumerate(regionlist):
         colormap[i] = (random.randint(5, 250), random.randint(5, 250), random.randint(5, 250))
 
     savemap(regionmap, colormap, "map6.png")
+
+
+def flow_river(basemap, tilemap, pending):
+    volume = 256
+
+    while pending and volume > 0:
+        x, y = pending.pop()
+
+        if tilemap[y][x] == '.':
+            break
+
+        volume -= 1
+
+        if tilemap[y][x] == '=':
+            continue
+
+        tilemap[y][x] = '='
+
+        pending.extend([(x+1, y), (x, y+1), (x-1, y), (x, y-1)])
+        pending.sort(key=lambda ab: basemap[ab[1]][ab[0]], reverse=True)
+        #print([(ab[0], ab[1], basemap[ab[1]][ab[0]]) for ab in pending])
+
 
 def procgen():
     basemap = []
@@ -383,7 +420,7 @@ def procgen():
             basemap[map_size-1-b][i] = 0
             basemap[i][b] = 0
             basemap[i][map_size-1-b] = 0
-    basemap[int(map_size/2)-1][int(map_size/2)-1] = 0
+    basemap[map_size//2-1][map_size//2-1] = 0
 
     perturb_point(basemap, border, border, map_size-1-border, map_size-1-border, 1)
 
@@ -391,25 +428,19 @@ def procgen():
     for x in range(0, map_size):
         tilemap.append(['.'] * map_size)
 
-    #print(nearest_three_points(basemap, 63, 63), interpolate_height(basemap, 63, 63))
-    #print(nearest_three_points(basemap, 62, 62), interpolate_height(basemap, 62, 62))
-    #return
+    heightmin = 100
+    heightmax = -100
+    avg = 0
 
-    #basemap = interpolate_heights(basemap)
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if basemap[y][x] < heightmin:
+                heightmin = basemap[y][x]
+            if basemap[y][x] > heightmax:
+                heightmax = basemap[y][x]
+            avg += basemap[y][x]
 
-    # heightmin = 100
-    # heightmax = -100
-    # avg = 0
-
-    # for y,row in enumerate(basemap):
-    #     for x,tile in enumerate(row):
-    #         if basemap[y][x] < heightmin:
-    #             heightmin = basemap[y][x]
-    #         if basemap[y][x] > heightmax:
-    #             heightmax = basemap[y][x]
-    #         avg += basemap[y][x]
-
-    # avg = avg / (map_size*map_size)
+    avg = avg / (map_size*map_size)
 
     mountain_elevation = 1-mountain_pct
     sea_elevation = 1-land_pct
@@ -449,18 +480,37 @@ def procgen():
 
     print("Lowering iterations", lowering_iter)
 
+    print("filtering islands")
     tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
+    print("expanding mountains")
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
+    print("expanding shores")
     tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
+    print("filtering puddles")
     tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
+    print("expanding sea")
+    tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+
+    points = []
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if tile >= mountain_elevation:
+                points.append((x,y))
+
+    random.shuffle(points)
+    for p in points[:16]:
+        flow_river(basemap, tilemap, [p])
+
+    tilemap = apply_filter(tilemap, fix_lakes, ["#", "=", "M"], False)
 
     colormap = {".": (101, 183, 255),
+                "=": (178, 229, 255),
                 "#": (52, 176, 0),
                 "M": (255, 255, 255)}
 
     savemap(tilemap, colormap, "map5.png")
 
-    find_regions(tilemap)
+    #find_regions(tilemap)
 
     #printmap(tilemap)
 
