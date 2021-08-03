@@ -5,7 +5,7 @@ import PIL.Image
 perturb_reduction = .60
 minimum_rect = 1
 map_size = 256
-land_pct = .15
+land_pct = .20
 mountain_pct = 0.03
 midp_rand = 0
 
@@ -291,6 +291,14 @@ connect_diagonals = [
      "._*"
      "***",
      "."],
+    ["*M_"
+     "*_M"
+     "***",
+     "M"],
+    ["_M*"
+     "M_*"
+     "***",
+     "M"],
 ]
 
 def check_rule(tilemap, rule, x, y, multi):
@@ -531,14 +539,18 @@ def procgen():
 
     # print("filtering islands")
     # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
+
     print("expanding mountains")
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
-    print("expanding shores")
-    tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
+
+    #print("expanding shores")
+    #tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
     # print("filtering puddles")
     # tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
-    # print("expanding sea")
-    # tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+
+    print("expanding sea")
+    tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+
     # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
 
     points = []
