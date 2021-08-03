@@ -78,48 +78,6 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
     perturb_point(basemap, x0, y2, x2, y1, r0)
     perturb_point(basemap, x2, y2, x1, y1, r0)
 
-def clamp(n):
-    return min(max(n, 0), map_size-1)
-
-def nearby_point(basemap, x, y, a, b, points):
-    a = clamp(a)
-    b = clamp(b)
-    if basemap[b][a] is None:
-        return
-    if (a,b) in points:
-        return
-    if len(points) < 3:
-        points.append((a, b))
-    else:
-        dist = math.sqrt((a-x)*(a-x) + (b-y)*(b-y))
-        for i in range(0, 3):
-            px = points[i][0]
-            py = points[i][1]
-            pdist = math.sqrt((px-x)*(px-x) + (py-y)*(py-y))
-            if dist < pdist:
-                points.insert(i, (a, b))
-                break
-        if len(points) > 3:
-            points.pop()
-
-
-def nearest_three_points(basemap, x, y):
-    points = []
-    n = 0
-    if basemap[y][x] is not None:
-        return points
-    while n < map_size:
-        n += 1
-        for i in range(-n, n):
-            nearby_point(basemap, x, y, x+i, y-n, points)
-            nearby_point(basemap, x, y, x+n, y+i, points)
-            nearby_point(basemap, x, y, x-i, y+n, points)
-            nearby_point(basemap, x, y, x-n, y-i, points)
-        if len(points) == 3:
-            break
-    return points
-
-
 eliminate_tiny_islands = [
     ["_.."
      ".#."
@@ -265,30 +223,74 @@ expand_sea = [
      "."]
 ]
 
-smooth_lakes = [
+smooth_rivers = [
     ["_=_"
-     "=_="
+     "M=M"
+     "MMM",
+     "M"],
+    ["MM_"
+     "M=="
+     "MM_",
+     "M"],
+    ["MMM"
+     "M=M"
      "_=_",
+     "M"],
+    ["_MM"
+     "==M"
+     "_MM",
+     "M"],
+    ["_=_"
+     "#=#"
+     "###",
+     "#"],
+    ["##_"
+     "#=="
+     "##_",
+     "#"],
+    ["###"
+     "#=#"
+     "_=_",
+     "#"],
+    ["_##"
+     "==#"
+     "_##",
+     "#"],
+    ["_M_"
+     "=M="
+     "===",
+     "="],
+    ["==_"
+     "=MM"
+     "==_",
+     "="],
+    ["==="
+     "=M="
+     "_M_",
+     "="],
+    ["_=="
+     "MM="
+     "_==",
      "="],
 ]
 
-smooth_rivers = [
-    ["M=M"
-     "M=M"
-     "MMM",
-     "M"],
-    ["MMM"
-     "M=="
-     "MMM",
-     "M"],
-    ["MMM"
-     "M=M"
-     "M=M",
-     "M"],
-    ["MMM"
-     "==M"
-     "MMM",
-     "M"],
+connect_diagonals = [
+    ["*=_"
+     "*_="
+     "***",
+     "="],
+    ["_=*"
+     "=_*"
+     "***",
+     "="],
+    ["*._"
+     "*_."
+     "***",
+     "."],
+    ["_.*"
+     "._*"
+     "***",
+     "."],
 ]
 
 def check_rule(tilemap, rule, x, y, multi):
@@ -296,7 +298,7 @@ def check_rule(tilemap, rule, x, y, multi):
         for i in range(0, 3):
             ruletile = rule[0][j*3 + i]
             checktile = tilemap[y+(j-1)][x+(i-1)]
-            if checktile == ruletile or (ruletile == "_" and checktile in multi):
+            if checktile == ruletile or (ruletile == "_" and checktile in multi) or ruletile == "*":
                 pass
             else:
                 return False
@@ -396,8 +398,8 @@ def find_regions(tilemap):
             regionlist[next_region].adjacent.add(current_region)
 
 
-    printmap(regionmap)
-    print(regionlist)
+    #printmap(regionmap)
+    #print(regionlist)
 
     colormap = {}
     for i,_ in enumerate(regionlist):
@@ -405,6 +407,27 @@ def find_regions(tilemap):
 
     savemap(regionmap, colormap, "map6.png")
 
+    return (regionmap, regionlist)
+
+def remove_small_regions(tilemap, regionlist):
+    for r in regionlist:
+        if len(r.points) > 5:
+            continue
+
+        repl = [regionlist[adj].tile for adj in r.adjacent]
+        random.shuffle(repl)
+        for p in r.points:
+            tilemap[p[1]][p[0]] = repl[0]
+
+
+def small_seas_become_lakes(tilemap, regionlist):
+    for r in regionlist:
+        if r.tile != '.':
+            continue
+        if len(r.points) > 40:
+            continue
+        for p in r.points:
+            tilemap[p[1]][p[0]] = '='
 
 def flow_river(basemap, tilemap, pending):
     volume = 256
@@ -499,39 +522,52 @@ def procgen():
 
     print("Lowering iterations", lowering_iter)
 
-    print("filtering islands")
-    tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
+    colormap = {".": (101, 183, 255),
+                "=": (178, 229, 255),
+                "#": (52, 176, 0),
+                "M": (255, 255, 255)}
+
+    savemap(tilemap, colormap, "map1.png")
+
+    # print("filtering islands")
+    # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
     print("expanding mountains")
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
     print("expanding shores")
     tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
-    print("filtering puddles")
-    tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
-    print("expanding sea")
-    tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
-    tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
+    # print("filtering puddles")
+    # tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
+    # print("expanding sea")
+    # tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+    # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
 
     points = []
     for y,row in enumerate(basemap):
         for x,tile in enumerate(row):
-            if tile >= mountain_elevation:
+            if tile >= (mountain_elevation + ((heightmax-mountain_elevation)*.5)):
                 points.append((x,y))
 
     random.shuffle(points)
     for p in points[:16]:
         flow_river(basemap, tilemap, [p])
 
-    tilemap = apply_filter(tilemap, smooth_lakes, ["#", "=", "M"], False)
-    tilemap = apply_filter(tilemap, smooth_rivers, [], True)
+    tilemap = apply_filter(tilemap, connect_diagonals, ["M", "#"], False)
 
-    colormap = {".": (101, 183, 255),
-                "=": (178, 229, 255),
-                "#": (52, 176, 0),
-                "M": (255, 255, 255)}
+    regionmap, regionlist = find_regions(tilemap)
+    remove_small_regions(tilemap, regionlist)
+
+    #tilemap = apply_filter(tilemap, smooth_lakes, ["#", "=", "M"], False)
+    tilemap = apply_filter(tilemap, smooth_rivers, ["M", "=", "#"], True)
+
+    regionmap, regionlist = find_regions(tilemap)
+    remove_small_regions(tilemap, regionlist)
+
+    savemap(tilemap, colormap, "map4.png")
+
+    regionmap, regionlist = find_regions(tilemap)
+    small_seas_become_lakes(tilemap, regionlist)
 
     savemap(tilemap, colormap, "map5.png")
-
-    #find_regions(tilemap)
 
     #printmap(tilemap)
 
