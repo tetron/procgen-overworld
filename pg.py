@@ -265,11 +265,30 @@ expand_sea = [
      "."]
 ]
 
-fix_lakes = [
+smooth_lakes = [
     ["_=_"
      "=_="
      "_=_",
      "="],
+]
+
+smooth_rivers = [
+    ["M=M"
+     "M=M"
+     "MMM",
+     "M"],
+    ["MMM"
+     "M=="
+     "MMM",
+     "M"],
+    ["MMM"
+     "M=M"
+     "M=M",
+     "M"],
+    ["MMM"
+     "==M"
+     "MMM",
+     "M"],
 ]
 
 def check_rule(tilemap, rule, x, y, multi):
@@ -490,6 +509,7 @@ def procgen():
     tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
     print("expanding sea")
     tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+    tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
 
     points = []
     for y,row in enumerate(basemap):
@@ -501,7 +521,8 @@ def procgen():
     for p in points[:16]:
         flow_river(basemap, tilemap, [p])
 
-    tilemap = apply_filter(tilemap, fix_lakes, ["#", "=", "M"], False)
+    tilemap = apply_filter(tilemap, smooth_lakes, ["#", "=", "M"], False)
+    tilemap = apply_filter(tilemap, smooth_rivers, [], True)
 
     colormap = {".": (101, 183, 255),
                 "=": (178, 229, 255),
