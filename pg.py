@@ -154,7 +154,7 @@ def interpolate_heights(basemap):
             newbasemap[y][x] = interpolate_height(basemap, x, y)
     return newbasemap
 
-eliminate_islands = [
+eliminate_tiny_islands = [
     ["_.."
      ".#."
      "...",
@@ -186,14 +186,28 @@ eliminate_islands = [
     ["..."
      ".#."
      ".._",
-     "."],
-    ["..."
-     ".M."
-     "...",
-     "."],
-    ["___"
-     "_M_"
-     "___",
+     "."]]
+
+eliminate_puddles = [
+    ["_##"
+     "#.#"
+     "###",
+     "#"],
+    ["##_"
+     "#.#"
+     "###",
+     "#"],
+    ["###"
+     "#.#"
+     "_##",
+     "#"],
+    ["###"
+     "#.#"
+     "##_",
+     "#"],
+    ["_#_"
+     "#.#"
+     "_#_",
      "#"]]
 
 expand_mountains = [
@@ -262,26 +276,103 @@ def check_rule(tilemap, rule, x, y, multi):
     return rule[1]
 
 
-def apply_filter(tilemap, rules, multi):
-    newtilemap = []
-    for x in range(0, map_size):
-        newtilemap.append(['.'] * map_size)
+def apply_filter(tilemap, rules, multi, repeat):
+    recur = True
+    while recur:
+        newtilemap = []
+        for x in range(0, map_size):
+            newtilemap.append(['.'] * map_size)
+
+        any_rule_matched = False
+        for y,row in enumerate(tilemap):
+            if y == 0 or y == (map_size-1):
+                continue
+            for x,tile in enumerate(row):
+                if x == 0 or x == (map_size-1):
+                    continue
+                rep = tilemap[y][x]
+                for rule in rules:
+                    check = check_rule(tilemap, rule, x, y, multi)
+                    if check is not False:
+                        rep = check
+                        any_rule_matched = True
+                        break
+                newtilemap[y][x] = rep
+        tilemap = newtilemap
+        recur = repeat and any_rule_matched
+
+    return tilemap
+
+def savemap(tilemap, filename):
+    img = PIL.Image.new("RGB", (map_size, map_size))
+
+    sea = (101, 183, 255)
+    land = (52, 176, 0)
+    mountains = (255, 255, 255)
 
     for y,row in enumerate(tilemap):
-        if y == 0 or y == (map_size-1):
-            continue
         for x,tile in enumerate(row):
-            if x == 0 or x == (map_size-1):
-                continue
-            rep = tilemap[y][x]
-            for rule in rules:
-                check = check_rule(tilemap, rule, x, y, multi)
-                if check is not False:
-                    rep = check
-                    break
-            newtilemap[y][x] = rep
+            if tilemap[y][x] == ".":
+                img.putpixel((x, y), sea)
+            if tilemap[y][x] == "#":
+                img.putpixel((x, y), land)
+            if tilemap[y][x] == "M":
+                img.putpixel((x, y), mountains)
 
-    return newtilemap
+    img.save(filename)
+
+
+def printmap(tilemap):
+    for y,row in enumerate(tilemap):
+        for x,tile in enumerate(row):
+            print(tilemap[y][x], end='')
+        print("")
+
+
+def find_regions(tilemap):
+    regionmap = []
+    for x in range(0, map_size):
+        regionmap.append([None] * map_size)
+    connections = {}
+    regionlist = ['.']
+
+    working_stack = [(0, 0, 0)]
+    pending = []
+
+    while working_stack:
+        while working_stack:
+            x, y, current_region = working_stack.pop()
+
+            if regionmap[y][x] is not None:
+                continue
+
+            regionmap[y][x] = current_region
+            curtile = tilemap[y][x]
+
+            adjacent = [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
+            for ab in adjacent:
+                if ab[0] >= 0 and ab[0] <= (map_size-1) and ab[1] >= 0 and ab[1] <= (map_size-1):
+                    next_tile = tilemap[ab[1]][ab[0]]
+                    if next_tile == curtile:
+                        working_stack.append((ab[0], ab[1], current_region))
+                    else:
+                        pending.append((ab[0], ab[1], current_region))
+
+        while pending and not working_stack:
+            x, y, current_region = pending.pop(0)
+            if regionmap[y][x] is None:
+                regionlist.append(tilemap[y][x])
+                next_region = len(regionlist)-1
+                working_stack.append((x, y, next_region))
+            elif regionmap[y][x] != current_region:
+                next_region = regionmap[y][x]
+            connections.setdefault(current_region, set()).add(next_region)
+            connections.setdefault(next_region, set()).add(current_region)
+
+
+    printmap(regionmap)
+    print(regionlist)
+    print(connections)
 
 
 def procgen():
@@ -362,32 +453,16 @@ def procgen():
 
     print("Lowering iterations", lowering_iter)
 
-    tilemap = apply_filter(tilemap, eliminate_islands, ["#", "."])
-    tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
-    # tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"])
-    tilemap = apply_filter(tilemap, expand_shores, ["#", "."])
+    tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
+    tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
+    tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
+    tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
 
-    # for y,row in enumerate(tilemap):
-    #     for x,tile in enumerate(row):
-    #         print(tilemap[y][x], end='')
-    #     print("")
+    savemap(tilemap, "map5.png")
 
-    img = PIL.Image.new("RGB", (map_size, map_size))
+    find_regions(tilemap)
 
-    sea = (101, 183, 255)
-    land = (52, 176, 0)
-    mountains = (255, 255, 255)
-
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            if tilemap[y][x] == ".":
-                img.putpixel((x, y), sea)
-            if tilemap[y][x] == "#":
-                img.putpixel((x, y), land)
-            if tilemap[y][x] == "M":
-                img.putpixel((x, y), mountains)
-
-    img.save("map.png")
+    #printmap(tilemap)
 
     return True
 
