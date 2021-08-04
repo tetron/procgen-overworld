@@ -138,6 +138,8 @@ CITY_WALL_GATE_W = 0x7D
 CITY_WALL_GATE_E = 0x7E
 CITY_WALL_SE2 = 0x7F
 
+
+
 def perturb_point(basemap, x0, y0, x1, y1, r0):
     #print((x0, y0), (x1, y1), (abs(x0 - x1), abs(y0 - y1)), r0)
     if abs(x0 - x1) <= minimum_rect and abs(y0 - y1) <= minimum_rect:

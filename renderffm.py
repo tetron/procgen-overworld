@@ -1,9 +1,10 @@
 import PIL.Image
+import sys
 
-def render():
+def render(inp, outp):
     maptiles = PIL.Image.open("maptiles.png")
 
-    mapffm = open("map5.ffm", "rb")
+    mapffm = open(inp, "rb")
 
     img = PIL.Image.new("RGB", (16*256, 16*256))
 
@@ -16,6 +17,6 @@ def render():
             img.paste(src, (x*16, y*16, x*16+16, y*16+16))
 
 
-    img.save("rendered.png")
+    img.save(outp)
 
-render()
+render(sys.argv[1], sys.argv[2])
