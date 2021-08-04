@@ -350,6 +350,21 @@ def savemap(tilemap, colormap, filename):
     img.save(filename)
 
 
+def saveffm(tilemap, name):
+    tobytes = {
+        ".": 0x17,
+        "#": 0x00,
+        "=": 0x44,
+        "M": 0x21,
+    }
+
+    with open(name, "wb") as f:
+        for y,row in enumerate(tilemap):
+            for x,tile in enumerate(row):
+                print(tobytes[tilemap[y][x]], end='')
+                f.write(bytes([tobytes[tilemap[y][x]]]))
+
+
 def printmap(tilemap):
     for y,row in enumerate(tilemap):
         for x,tile in enumerate(row):
@@ -580,6 +595,7 @@ def procgen():
     small_seas_become_lakes(tilemap, regionlist)
 
     savemap(tilemap, colormap, "map5.png")
+    saveffm(tilemap, "map5.ffm")
 
     #printmap(tilemap)
 
