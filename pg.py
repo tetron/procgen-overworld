@@ -302,6 +302,25 @@ connect_diagonals = [
      "M"],
 ]
 
+apply_shores = [
+    [["*", SEA, LAND,
+      "*", SEA, LAND,
+      "*", SEA, LAND],
+     SHORE_W],
+    [[LAND, SEA, "*",
+      LAND, SEA, "*",
+      LAND, SEA, "*"],
+     SHORE_E],
+    [["*", "*", "*",
+      SEA, SEA, SEA,
+      LAND, LAND, LAND],
+     SHORE_N],
+    [[LAND, LAND, LAND,
+       SEA, SEA, SEA,
+       "*", "*", "*",],
+     SHORE_S],
+]
+
 def check_rule(tilemap, rule, x, y, multi):
     for j in range(0, 3):
         for i in range(0, 3):
@@ -319,7 +338,7 @@ def apply_filter(tilemap, rules, multi, repeat):
     while recur:
         newtilemap = []
         for x in range(0, map_size):
-            newtilemap.append(['.'] * map_size)
+            newtilemap.append([tilemap[0][0]] * map_size)
 
         any_rule_matched = False
         for y,row in enumerate(tilemap):
@@ -352,7 +371,6 @@ def savemap(tilemap, colormap, filename):
 
 
 def saveffm(tilemap, name):
-
     with open(name, "wb") as f:
         for y,row in enumerate(tilemap):
             for x,tile in enumerate(row):
@@ -612,6 +630,8 @@ def procgen():
     tilemap = to_ffm(tilemap)
 
     #render_feature(tilemap, VANILLA_CORNERIA, 8, 8)
+
+    tilemap = apply_filter(tilemap, apply_shores, [], False)
 
     saveffm(tilemap, "map5.ffm")
 
