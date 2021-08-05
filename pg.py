@@ -2,6 +2,7 @@ import random
 import math
 import PIL.Image
 from ff1features import *
+from ff1filters import *
 
 perturb_reduction = .60
 minimum_rect = 1
@@ -79,247 +80,6 @@ def perturb_point(basemap, x0, y0, x1, y1, r0):
     perturb_point(basemap, x0, y2, x2, y1, r0)
     perturb_point(basemap, x2, y2, x1, y1, r0)
 
-eliminate_tiny_islands = [
-    ["_.."
-     ".#."
-     "...",
-     "."],
-    ["._."
-     ".#."
-     "...",
-     "."],
-    [".._"
-     ".#."
-     "...",
-     "."],
-    ["..."
-     "_#."
-     "...",
-     "."],
-    ["..."
-     ".#_"
-     "...",
-     "."],
-    ["..."
-     ".#."
-     "_..",
-     "."],
-    ["..."
-     ".#."
-     "._.",
-     "."],
-    ["..."
-     ".#."
-     ".._",
-     "."]]
-
-eliminate_puddles = [
-    ["_##"
-     "#.#"
-     "###",
-     "#"],
-    ["##_"
-     "#.#"
-     "###",
-     "#"],
-    ["###"
-     "#.#"
-     "_##",
-     "#"],
-    ["###"
-     "#.#"
-     "##_",
-     "#"],
-    ["_#_"
-     "#.#"
-     "_#_",
-     "#"]]
-
-expand_mountains = [
-    ["M__"
-     "___"
-     "___",
-     "M"],
-    ["_M_"
-     "___"
-     "___",
-     "M"],
-    ["__M"
-     "___"
-     "___",
-     "M"],
-    ["___"
-     "M__"
-     "___",
-     "M"],
-    ["___"
-     "__M"
-     "___",
-     "M"],
-    ["___"
-     "___"
-     "M__",
-     "M"],
-    ["___"
-     "___"
-     "_M_",
-     "M"],
-    ["___"
-     "___"
-     "__M",
-     "M"]
-]
-
-expand_shores = [
-    ["###"
-     "_._"
-     "___",
-     "#"],
-    ["#__"
-     "#._"
-     "#__",
-     "#"],
-    ["___"
-     "_._"
-     "###",
-     "#"],
-    ["__#"
-     "_.#"
-     "__#",
-     "#"]
-]
-
-expand_sea = [
-    [".__"
-     "___"
-     "___",
-     "."],
-    ["_._"
-     "___"
-     "___",
-     "."],
-    ["__."
-     "___"
-     "___",
-     "."],
-    ["___"
-     ".__"
-     "___",
-     "."],
-    ["___"
-     "__."
-     "___",
-     "."],
-    ["___"
-     "___"
-     ".__",
-     "."],
-    ["___"
-     "___"
-     "_._",
-     "."],
-    ["___"
-     "___"
-     "__.",
-     "."]
-]
-
-smooth_rivers = [
-    ["_=_"
-     "M=M"
-     "MMM",
-     "M"],
-    ["MM_"
-     "M=="
-     "MM_",
-     "M"],
-    ["MMM"
-     "M=M"
-     "_=_",
-     "M"],
-    ["_MM"
-     "==M"
-     "_MM",
-     "M"],
-    ["_=_"
-     "#=#"
-     "###",
-     "#"],
-    ["##_"
-     "#=="
-     "##_",
-     "#"],
-    ["###"
-     "#=#"
-     "_=_",
-     "#"],
-    ["_##"
-     "==#"
-     "_##",
-     "#"],
-    ["_M_"
-     "=M="
-     "===",
-     "="],
-    ["==_"
-     "=MM"
-     "==_",
-     "="],
-    ["==="
-     "=M="
-     "_M_",
-     "="],
-    ["_=="
-     "MM="
-     "_==",
-     "="],
-]
-
-connect_diagonals = [
-    ["*=_"
-     "*_="
-     "***",
-     "="],
-    ["_=*"
-     "=_*"
-     "***",
-     "="],
-    ["*._"
-     "*_."
-     "***",
-     "."],
-    ["_.*"
-     "._*"
-     "***",
-     "."],
-    ["*M_"
-     "*_M"
-     "***",
-     "M"],
-    ["_M*"
-     "M_*"
-     "***",
-     "M"],
-]
-
-apply_shores = [
-    [["*", SEA, LAND,
-      "*", SEA, LAND,
-      "*", SEA, LAND],
-     SHORE_W],
-    [[LAND, SEA, "*",
-      LAND, SEA, "*",
-      LAND, SEA, "*"],
-     SHORE_E],
-    [["*", "*", "*",
-      SEA, SEA, SEA,
-      LAND, LAND, LAND],
-     SHORE_N],
-    [[LAND, LAND, LAND,
-       SEA, SEA, SEA,
-       "*", "*", "*",],
-     SHORE_S],
-]
 
 def check_rule(tilemap, rule, x, y, multi):
     for j in range(0, 3):
@@ -631,7 +391,16 @@ def procgen():
 
     #render_feature(tilemap, VANILLA_CORNERIA, 8, 8)
 
-    tilemap = apply_filter(tilemap, apply_shores, [], False)
+    tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
+    tilemap = apply_filter(tilemap, river_borders, [SEA, LAND,
+                                                       MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+                                                       MOUNTAIN_W, MOUNTAIN, MOUNTAIN_E,
+                                                       MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+                           False)
+
+    tilemap = apply_filter(tilemap, apply_shores1, [], False)
+    tilemap = apply_filter(tilemap, apply_shores2, [], False)
+    tilemap = apply_filter(tilemap, apply_shores3, [], False)
 
     saveffm(tilemap, "map5.ffm")
 
