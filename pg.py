@@ -7,8 +7,8 @@ from ff1filters import *
 perturb_reduction = .60
 minimum_rect = 1
 map_size = 256
-land_pct = .20
-mountain_pct = 0.03
+land_pct = .25
+mountain_pct = 0.04
 midp_rand = 0
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
@@ -215,6 +215,23 @@ def remove_small_regions(tilemap, regionlist):
             tilemap[p[1]][p[0]] = repl[0]
 
 
+def remove_small_islands(tilemap, regionlist):
+    candidates = []
+    for r in regionlist:
+        if len(r.points) > 12:
+            continue
+        if len(r.adjacent) == 1:
+            adj = list(r.adjacent)[0]
+            if regionlist[adj].tile == '.':
+                candidates.append(r)
+
+    random.shuffle(candidates)
+
+    for r in candidates[:len(candidates)-4]:
+        for p in r.points:
+            tilemap[p[1]][p[0]] = '.'
+
+
 def small_seas_become_lakes(tilemap, regionlist):
     for r in regionlist:
         if r.tile != '.':
@@ -343,21 +360,11 @@ def procgen():
 
     savemap(tilemap, colormap, "map1.png")
 
-    # print("filtering islands")
-    # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
-
     print("expanding mountains")
     tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
 
-    #print("expanding shores")
-    #tilemap = apply_filter(tilemap, expand_shores, ["#", "."], False)
-    # print("filtering puddles")
-    # tilemap = apply_filter(tilemap, eliminate_puddles, ["#", "."], True)
-
     print("expanding sea")
     tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
-
-    # tilemap = apply_filter(tilemap, eliminate_tiny_islands, ["#", "."], True)
 
     points = []
     for y,row in enumerate(basemap):
@@ -365,22 +372,26 @@ def procgen():
             if tile >= (mountain_elevation + ((heightmax-mountain_elevation)*.5)):
                 points.append((x,y))
 
+    print("flowing rivers")
     random.shuffle(points)
     for p in points[:16]:
         flow_river(basemap, tilemap, [p])
 
     tilemap = apply_filter(tilemap, connect_diagonals, ["M", "#"], False)
 
+    print("removing small regions")
     regionmap, regionlist = find_regions(tilemap)
     remove_small_regions(tilemap, regionlist)
 
-    #tilemap = apply_filter(tilemap, smooth_lakes, ["#", "=", "M"], False)
+    print("smoothing rivers")
     tilemap = apply_filter(tilemap, smooth_rivers, ["M", "=", "#"], True)
+    tilemap = apply_filter(tilemap, fixup_mountains, ["#", "=", "."], False)
 
     regionmap, regionlist = find_regions(tilemap)
     remove_small_regions(tilemap, regionlist)
 
-    savemap(tilemap, colormap, "map4.png")
+    regionmap, regionlist = find_regions(tilemap)
+    remove_small_islands(tilemap, regionlist)
 
     regionmap, regionlist = find_regions(tilemap)
     small_seas_become_lakes(tilemap, regionlist)
@@ -388,8 +399,6 @@ def procgen():
     savemap(tilemap, colormap, "map5.png")
 
     tilemap = to_ffm(tilemap)
-
-    #render_feature(tilemap, VANILLA_CORNERIA, 8, 8)
 
     tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
     tilemap = apply_filter(tilemap, river_borders, [SEA, LAND,
@@ -401,6 +410,20 @@ def procgen():
     tilemap = apply_filter(tilemap, apply_shores1, [], False)
     tilemap = apply_filter(tilemap, apply_shores2, [], False)
     tilemap = apply_filter(tilemap, apply_shores3, [], False)
+
+    # features = [CONERIA_CITY, TEMPLE_OF_FIENDS, PRAVOKA_CITY, ELFLAND_CASTLE, ASTOS_CASTLE,
+    #             ORDEALS_CASTLE, ELFLAND_TOWN, MELMOND_TOWN, ONRAC_TOWN,
+    #             LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
+    #             MIRAGE_TOWER, VOLCANO, OASIS]
+
+    # x = 8
+    # y = 8
+    # for i,_ in enumerate(features):
+    #     render_feature(tilemap, features[i], x, y)
+    #     x += 8
+    #     if x > 255:
+    #         y += 8
+    #         x = 8
 
     saveffm(tilemap, "map5.ffm")
 
