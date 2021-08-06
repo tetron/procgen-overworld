@@ -144,10 +144,33 @@ def printmap(tilemap):
         print("")
 
 class Region:
-    def __init__(self, tile):
+    def __init__(self, tile, regionid):
         self.tile = tile
-        self.points = []
+        self.regionid = regionid
+        self.points = set()
         self.adjacent = set()
+        self.nwcorner = None
+        self.secorner = None
+
+    def addpoint(self, x, y):
+        self.points.add((x, y))
+        if self.nwcorner is None:
+            self.nwcorner = (x, y)
+        if self.secorner is None:
+            self.secorner = (x, y)
+
+        if x < self.nwcorner[0]:
+            self.nwcorner = (x, self.nwcorner[1])
+
+        if y < self.nwcorner[1]:
+            self.nwcorner = (self.nwcorner[0], y)
+
+        if x > self.secorner[0]:
+            self.secorner = (x, self.secorner[1])
+
+        if y > self.secorner[1]:
+            self.secorner = (self.secorner[0], y)
+
 
     def __repr__(self):
         return "<'%s' %s %s>" % (self.tile, self.points, self.adjacent)
@@ -156,7 +179,7 @@ def find_regions(tilemap):
     regionmap = []
     for x in range(0, map_size):
         regionmap.append([None] * map_size)
-    regionlist = [Region('.')]
+    regionlist = [Region('.', 0)]
 
     working_stack = [(0, 0, 0)]
     pending = []
@@ -169,7 +192,7 @@ def find_regions(tilemap):
                 continue
 
             regionmap[y][x] = current_region
-            regionlist[current_region].points.append((x, y))
+            regionlist[current_region].addpoint(x, y)
             curtile = tilemap[y][x]
 
             adjacent = [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
@@ -184,7 +207,7 @@ def find_regions(tilemap):
         while pending and not working_stack:
             x, y, current_region = pending.pop(0)
             if regionmap[y][x] is None:
-                regionlist.append(Region(tilemap[y][x]))
+                regionlist.append(Region(tilemap[y][x], len(regionlist)))
                 next_region = len(regionlist)-1
                 working_stack.append((x, y, next_region))
             elif regionmap[y][x] != current_region:
@@ -275,11 +298,42 @@ def to_ffm(tilemap):
     return tilemap
 
 
-def render_feature(tilemap, feature, x, y):
+def render_feature(tilemap, regionmap, feature, x, y):
     for y2,row in enumerate(feature):
         for x2,tile in enumerate(row):
             if feature[y2][x2] is not None:
                 tilemap[y+y2][x+x2] = feature[y2][x2]
+                regionmap[y+y2][x+x2] = -1
+
+def place_feature_in_region(r, regionmap, tilemap, feature):
+    h = len(feature)+2
+    w = len(feature[0])+2
+
+    candidates = set()
+
+    for y in range(r.nwcorner[1], r.secorner[1]-h):
+        for x in range(r.nwcorner[0], r.secorner[0]-w):
+            fits = True
+            for y2 in range(y, y+h):
+                for x2 in range(x, x+w):
+                    if regionmap[y2][x2] != r.regionid:
+                        fits = False
+                        break
+                if not fits:
+                    break
+            if fits:
+                candidates.add((x, y))
+
+    candidates = list(candidates)
+
+    if not candidates:
+        return False
+
+    random.shuffle(candidates)
+
+    render_feature(tilemap, regionmap, feature, candidates[0][0]+1, candidates[0][1]+1)
+    return True
+
 
 def procgen():
     basemap = []
@@ -400,6 +454,39 @@ def procgen():
 
     tilemap = to_ffm(tilemap)
 
+    regionmap, regionlist = find_regions(tilemap)
+
+    features = [CONERIA_CITY, TEMPLE_OF_FIENDS, PRAVOKA_CITY, ELFLAND_TOWN_CASTLE, ASTOS_CASTLE,
+                ORDEALS_CASTLE, MELMOND_TOWN, ONRAC_TOWN,
+                LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
+                MIRAGE_TOWER, VOLCANO, OASIS,
+                [[MARSH]], [[BAHAMUTS_CAVE]], [[CARDIA_1]], [[CARDIA_2]],
+                [[CARDIA_3]], [[CARDIA_4]], [[CARDIA_5]]
+    ]
+
+    random.shuffle(features)
+
+    landregions = [r for r in regionlist if r.tile == LAND]
+    landregions.sort(key=lambda r: len(r.points), reverse=True)
+    total = 0
+    for r in landregions:
+        total += len(r.points)
+
+    ids = list(range(0, len(regionlist)))
+    random.shuffle(ids)
+    i = 0
+    for f in features:
+        found = False
+        while not found:
+            val = random.randint(0, total)
+            for r in landregions:
+                val -= len(r.points)
+                if val <= 0:
+                    break
+            if place_feature_in_region(r, regionmap, tilemap, f):
+                found = True
+
+
     tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
     tilemap = apply_filter(tilemap, river_borders, [SEA, LAND,
                                                        MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
@@ -411,10 +498,25 @@ def procgen():
     tilemap = apply_filter(tilemap, apply_shores2, [], False)
     tilemap = apply_filter(tilemap, apply_shores3, [], False)
 
-    # features = [CONERIA_CITY, TEMPLE_OF_FIENDS, PRAVOKA_CITY, ELFLAND_CASTLE, ASTOS_CASTLE,
-    #             ORDEALS_CASTLE, ELFLAND_TOWN, MELMOND_TOWN, ONRAC_TOWN,
-    #             LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
-    #             MIRAGE_TOWER, VOLCANO, OASIS]
+
+    # single tile features
+    #
+    # matoya's cave
+    # dwarf cave
+    # marsh cave
+    # earth cave
+    # sarda's cave
+    # titan's tunnel W/E
+    # ice cave
+    # bahamut's cave
+    # cardia 1-5
+    # waterfall
+    #
+    # 14 complex features + 15 simple features +
+    #
+    # bridge
+    # canal
+    # airship desert
 
     # x = 8
     # y = 8
