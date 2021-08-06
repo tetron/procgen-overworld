@@ -4,11 +4,11 @@ import PIL.Image
 from ff1features import *
 from ff1filters import *
 
-perturb_reduction = .60
+perturb_reduction = .64
 minimum_rect = 1
 map_size = 256
-land_pct = .25
-mountain_pct = 0.04
+land_pct = .26
+mountain_pct = 0.06
 midp_rand = 0
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
@@ -501,6 +501,7 @@ def procgen():
     for r in landregions:
         total += len(r.points)
 
+    print("Placing features")
     ids = list(range(0, len(regionlist)))
     random.shuffle(ids)
     i = 0
@@ -517,6 +518,7 @@ def procgen():
 
     caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_E, TITAN_W, SARDAS_CAVE, ICE_CAVE]
 
+    print("Placing caves")
     for c in caves:
         found = False
         while not found:
