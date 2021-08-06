@@ -334,6 +334,35 @@ def place_feature_in_region(r, regionmap, tilemap, feature):
     render_feature(tilemap, regionmap, feature, candidates[0][0]+1, candidates[0][1]+1)
     return True
 
+def place_cave(r, regionmap, tilemap, cave):
+    candidates = set()
+
+    for y in range(r.nwcorner[1], r.secorner[1]):
+        for x in range(r.nwcorner[0]+1, r.secorner[0]-1):
+            if regionmap[y][x] != r.regionid:
+                continue
+            fits = True
+            for x2 in range(x-1, x+2):
+                if tilemap[y-1][x2] != MOUNTAIN:
+                    fits = False
+                    break
+            for x2 in range(x-1, x+2):
+                if tilemap[y][x2] != LAND:
+                    fits = False
+                    break
+            if fits:
+                candidates.add((x, y-1))
+
+    candidates = list(candidates)
+
+    if not candidates:
+        return False
+
+    random.shuffle(candidates)
+
+    tilemap[candidates[0][1]][candidates[0][0]] = cave
+    return True
+
 
 def procgen():
     basemap = []
@@ -460,7 +489,7 @@ def procgen():
                 ORDEALS_CASTLE, MELMOND_TOWN, ONRAC_TOWN,
                 LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
                 MIRAGE_TOWER, VOLCANO, OASIS,
-                [[MARSH]], [[BAHAMUTS_CAVE]], [[CARDIA_1]], [[CARDIA_2]],
+                [[MARSH_CAVE]], [[BAHAMUTS_CAVE]], [[CARDIA_1]], [[CARDIA_2]],
                 [[CARDIA_3]], [[CARDIA_4]], [[CARDIA_5]]
     ]
 
@@ -486,6 +515,18 @@ def procgen():
             if place_feature_in_region(r, regionmap, tilemap, f):
                 found = True
 
+    caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_E, TITAN_W, SARDAS_CAVE, ICE_CAVE]
+
+    for c in caves:
+        found = False
+        while not found:
+            val = random.randint(0, total)
+            for r in landregions:
+                val -= len(r.points)
+                if val <= 0:
+                    break
+            if place_cave(r, regionmap, tilemap, c):
+                found = True
 
     tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
     tilemap = apply_filter(tilemap, river_borders, [SEA, LAND,
