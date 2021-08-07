@@ -298,14 +298,26 @@ def to_ffm(tilemap):
     return tilemap
 
 
-def render_feature(tilemap, regionmap, feature, x, y):
+def render_feature(tilemap, regionmap, weightmap, feature, x, y):
     for y2,row in enumerate(feature):
         for x2,tile in enumerate(row):
             if feature[y2][x2] is not None:
                 tilemap[y+y2][x+x2] = feature[y2][x2]
                 regionmap[y+y2][x+x2] = -1
 
-def place_feature_in_region(r, regionmap, tilemap, feature):
+    y += len(feature)//2
+    x += len(feature[0])//2
+
+    radius = 10
+    for y2 in range(y-radius, y+radius+1):
+        for x2 in range(x-radius, x+radius+1):
+            if x2<0 or x2>(map_size-1) or y2<0 or y2>(map_size-1):
+                continue
+            dist = int(math.sqrt((x-x2)*(x-x2) + (y-y2)*(y-y2)))
+            if dist <= radius:
+                weightmap[y2][x2] += dist
+
+def place_feature_in_region(r, regionmap, tilemap, weightmap, feature):
     h = len(feature)+2
     w = len(feature[0])+2
 
@@ -331,10 +343,15 @@ def place_feature_in_region(r, regionmap, tilemap, feature):
 
     random.shuffle(candidates)
 
-    render_feature(tilemap, regionmap, feature, candidates[0][0]+1, candidates[0][1]+1)
+    candidates.sort(key=lambda n: weightmap[n[1]+(h//2)][n[0]+(w//2)])
+    if weightmap[candidates[0][1]+(h//2)][candidates[0][0]+(w//2)] > 0:
+        return False
+
+    render_feature(tilemap, regionmap, weightmap, feature, candidates[0][0]+1, candidates[0][1]+1)
     return True
 
-def place_cave(r, regionmap, tilemap, cave):
+
+def place_cave(r, regionmap, tilemap, weightmap, cave):
     candidates = set()
 
     for y in range(r.nwcorner[1], r.secorner[1]):
@@ -359,8 +376,11 @@ def place_cave(r, regionmap, tilemap, cave):
         return False
 
     random.shuffle(candidates)
+    candidates.sort(key=lambda n: weightmap[n[1]][n[0]])
+    if weightmap[candidates[0][1]][candidates[0][0]] > 0:
+        return False
 
-    tilemap[candidates[0][1]][candidates[0][0]] = cave
+    render_feature(tilemap, regionmap, weightmap, [[cave]], candidates[0][0], candidates[0][1])
     return True
 
 
@@ -502,6 +522,9 @@ def procgen():
         total += len(r.points)
 
     print("Placing features")
+    weightmap = []
+    for x in range(0, map_size):
+        weightmap.append([0] * map_size)
     ids = list(range(0, len(regionlist)))
     random.shuffle(ids)
     i = 0
@@ -513,7 +536,7 @@ def procgen():
                 val -= len(r.points)
                 if val <= 0:
                     break
-            if place_feature_in_region(r, regionmap, tilemap, f):
+            if place_feature_in_region(r, regionmap, tilemap, weightmap, f):
                 found = True
 
     caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_E, TITAN_W, SARDAS_CAVE, ICE_CAVE]
@@ -527,7 +550,7 @@ def procgen():
                 val -= len(r.points)
                 if val <= 0:
                     break
-            if place_cave(r, regionmap, tilemap, c):
+            if place_cave(r, regionmap, tilemap, weightmap, c):
                 found = True
 
     tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
