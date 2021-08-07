@@ -1,14 +1,15 @@
 import random
 import math
+import json
 import PIL.Image
 from ff1features import *
 from ff1filters import *
 
-perturb_reduction = .64
+perturb_reduction = .63
 minimum_rect = 1
 map_size = 256
 land_pct = .26
-mountain_pct = 0.06
+mountain_pct = 0.055
 midp_rand = 0
 
 def perturb_point(basemap, x0, y0, x1, y1, r0):
@@ -86,7 +87,7 @@ def check_rule(tilemap, rule, x, y, multi):
         for i in range(0, 3):
             ruletile = rule[0][j*3 + i]
             checktile = tilemap[y+(j-1)][x+(i-1)]
-            if checktile == ruletile or (ruletile == "_" and checktile in multi) or ruletile == "*":
+            if (checktile == ruletile) or (ruletile in multi and checktile in multi[ruletile]):
                 pass
             else:
                 return False
@@ -308,16 +309,16 @@ def render_feature(tilemap, regionmap, weightmap, feature, x, y):
     y += len(feature)//2
     x += len(feature[0])//2
 
-    radius = 10
+    radius = 20
     for y2 in range(y-radius, y+radius+1):
         for x2 in range(x-radius, x+radius+1):
             if x2<0 or x2>(map_size-1) or y2<0 or y2>(map_size-1):
                 continue
             dist = int(math.sqrt((x-x2)*(x-x2) + (y-y2)*(y-y2)))
             if dist <= radius:
-                weightmap[y2][x2] += dist
+                weightmap[y2][x2] += (radius - dist)
 
-def place_feature_in_region(r, regionmap, tilemap, weightmap, feature):
+def place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, feature):
     h = len(feature)+2
     w = len(feature[0])+2
 
@@ -344,14 +345,14 @@ def place_feature_in_region(r, regionmap, tilemap, weightmap, feature):
     random.shuffle(candidates)
 
     candidates.sort(key=lambda n: weightmap[n[1]+(h//2)][n[0]+(w//2)])
-    if weightmap[candidates[0][1]+(h//2)][candidates[0][0]+(w//2)] > 0:
+    if weightmap[candidates[0][1]+(h//2)][candidates[0][0]+(w//2)] > maxweight:
         return False
 
     render_feature(tilemap, regionmap, weightmap, feature, candidates[0][0]+1, candidates[0][1]+1)
-    return True
+    return (candidates[0][0]+1, candidates[0][1]+1)
 
 
-def place_cave(r, regionmap, tilemap, weightmap, cave):
+def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
     candidates = set()
 
     for y in range(r.nwcorner[1], r.secorner[1]):
@@ -377,11 +378,87 @@ def place_cave(r, regionmap, tilemap, weightmap, cave):
 
     random.shuffle(candidates)
     candidates.sort(key=lambda n: weightmap[n[1]][n[0]])
-    if weightmap[candidates[0][1]][candidates[0][0]] > 0:
+    if weightmap[candidates[0][1]][candidates[0][0]] > maxweight:
         return False
 
     render_feature(tilemap, regionmap, weightmap, [[cave]], candidates[0][0], candidates[0][1])
     return True
+
+
+def splat(tilemap, x, y, biometype):
+    #sz = random.randint(150, 300)
+    sz = 400
+
+    pending = [(x, y)]
+
+    while sz > 0 and pending:
+        x, y = pending.pop(0)
+
+        if tilemap[y][x] == LAND:
+            tilemap[y][x] = biometype
+            sz -= 1
+        else:
+            continue
+
+        #directions = random.randint(1, 15)
+        #if directions & 8:
+        pending.append((x-1, y))
+        #if directions & 4:
+        pending.append((x+1, y))
+        #if directions & 2:
+        pending.append((x, y-1))
+        #if directions & 1:
+        pending.append((x, y+1))
+
+
+def add_biomes(tilemap, landregions):
+    # biomemap = []
+    # for x in range(0, map_size):
+    #     biomemap.append([None] * map_size)
+
+    # biomemap[0][0] = 0
+    # biomemap[map_size-1][0] = 0
+    # biomemap[0][map_size-1] = 0
+    # biomemap[map_size-1][map_size-1] = 0
+
+    # perturb_point(biomemap, 0, 0, map_size-1, map_size-1, 1)
+
+    # for y,row in enumerate(biomemap):
+    #     for x,tile in enumerate(row):
+    #         if tilemap[y][x] != LAND:
+    #             continue
+    #         if tile < -.5:
+    #             tilemap[y][x] = MARSH
+    #             continue
+    #         if tile < .25:
+    #             tilemap[y][x] = FOREST
+    #             continue
+    #         if tile < .5:
+    #             tilemap[y][x] = GRASS
+    #             continue
+    #         else:
+    #             tilemap[y][x] = DESERT
+    #             continue
+
+    biomes = [LAND, FOREST, GRASS, MARSH, DESERT]
+    for r in landregions:
+        for i in range(0, len(r.points)//100 + 1):
+            b = random.randint(0, len(biomes)-1)
+            pts = list(r.points)
+            p = random.randint(0, len(pts)-1)
+            splat(tilemap, pts[p][0], pts[p][1], biomes[b])
+
+    all_tiles = set(ALL_TILES)
+    non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
+    non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
+    non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
+    non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
+                                             FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
+    tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, marsh_borders, {"_": non_marsh_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, grass_borders, {"_": non_grass_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
+    return tilemap
 
 
 def procgen():
@@ -463,11 +540,13 @@ def procgen():
 
     savemap(tilemap, colormap, "map1.png")
 
+    all_simple_tiles = ["#", ".", "=", "M"]
+
     print("expanding mountains")
-    tilemap = apply_filter(tilemap, expand_mountains, ["#", ".", "M"], False)
+    tilemap = apply_filter(tilemap, expand_mountains, {"_": ["#", ".", "M"], "*": all_simple_tiles}, False)
 
     print("expanding sea")
-    tilemap = apply_filter(tilemap, expand_sea, ["#", ".", "M"], False)
+    tilemap = apply_filter(tilemap, expand_sea, {"_": ["#", ".", "M"], "*": all_simple_tiles}, False)
 
     points = []
     for y,row in enumerate(basemap):
@@ -480,15 +559,15 @@ def procgen():
     for p in points[:16]:
         flow_river(basemap, tilemap, [p])
 
-    tilemap = apply_filter(tilemap, connect_diagonals, ["M", "#"], False)
+    tilemap = apply_filter(tilemap, connect_diagonals, {"_": ["M", "#"], "*": all_simple_tiles}, False)
 
     print("removing small regions")
     regionmap, regionlist = find_regions(tilemap)
     remove_small_regions(tilemap, regionlist)
 
     print("smoothing rivers")
-    tilemap = apply_filter(tilemap, smooth_rivers, ["M", "=", "#"], True)
-    tilemap = apply_filter(tilemap, fixup_mountains, ["#", "=", "."], False)
+    tilemap = apply_filter(tilemap, smooth_rivers, {"_": ["M", "=", "#"], "*": all_simple_tiles}, True)
+    tilemap = apply_filter(tilemap, fixup_mountains, {"_": ["#", "=", "."], "*": all_simple_tiles}, False)
 
     regionmap, regionlist = find_regions(tilemap)
     remove_small_regions(tilemap, regionlist)
@@ -521,6 +600,8 @@ def procgen():
     for r in landregions:
         total += len(r.points)
 
+    starting_location = None
+
     print("Placing features")
     weightmap = []
     for x in range(0, map_size):
@@ -530,39 +611,52 @@ def procgen():
     i = 0
     for f in features:
         found = False
+        maxweight = 0
         while not found:
             val = random.randint(0, total)
             for r in landregions:
                 val -= len(r.points)
                 if val <= 0:
                     break
-            if place_feature_in_region(r, regionmap, tilemap, weightmap, f):
+            loc = place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, f)
+            if loc:
                 found = True
+                if f is CONERIA_CITY:
+                    starting_location = (loc[0]+3, loc[1]+7)
+            maxweight += 1
 
     caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_E, TITAN_W, SARDAS_CAVE, ICE_CAVE]
 
     print("Placing caves")
     for c in caves:
         found = False
+        maxweight = 0
         while not found:
             val = random.randint(0, total)
             for r in landregions:
                 val -= len(r.points)
                 if val <= 0:
                     break
-            if place_cave(r, regionmap, tilemap, weightmap, c):
+            if place_cave(r, regionmap, tilemap, weightmap, maxweight, c):
                 found = True
+            maxweight += 1
 
-    tilemap = apply_filter(tilemap, mountain_borders, [SEA, RIVER, LAND], False)
-    tilemap = apply_filter(tilemap, river_borders, [SEA, LAND,
+    all_tiles = set(ALL_TILES)
+
+    tilemap = apply_filter(tilemap, mountain_borders, {"_": [SEA, RIVER, LAND], "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, river_borders, {"_": [SEA, LAND,
                                                        MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
                                                        MOUNTAIN_W, MOUNTAIN, MOUNTAIN_E,
                                                        MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+                                                    "*": all_tiles},
                            False)
 
-    tilemap = apply_filter(tilemap, apply_shores1, [], False)
-    tilemap = apply_filter(tilemap, apply_shores2, [], False)
-    tilemap = apply_filter(tilemap, apply_shores3, [], False)
+    tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles}, False)
+
+
+    tilemap = add_biomes(tilemap, landregions)
 
 
     # single tile features
@@ -594,6 +688,23 @@ def procgen():
     #         x = 8
 
     saveffm(tilemap, "map5.ffm")
+    with open("map5.json", "w") as f:
+        json.dump({
+            "StartingLocation": {
+                "X": starting_location[0],
+                "Y": starting_location[1]
+            },
+	"AirShipLocation": {
+		"X": 0,
+		"Y": 0
+	},
+	"ShipLocations": [
+	],
+	"TeleporterFixups": [
+	],
+	"DomainFixups": [
+	]
+        }, f, indent=4)
 
     #printmap(tilemap)
 

@@ -315,3 +315,112 @@ river_borders = [
       "*", "_",   "*"],
      RIVER_SW],
 ]
+
+desert_borders = [
+    [["*", "_",   "*",
+     "_", DESERT, DESERT,
+     "*", DESERT,   "*"],
+     DESERT_NW],
+
+    [["*", "_",   "*",
+     DESERT, DESERT, "_",
+       "*", DESERT,   "*"],
+     DESERT_NE],
+
+    [["*",  DESERT,   "*",
+     DESERT, DESERT, "_",
+       "*", "_",   "*"],
+     DESERT_SE],
+
+    [["*",  DESERT,   "*",
+      "_",  DESERT, DESERT,
+      "*", "_",   "*"],
+     DESERT_SW],
+]
+
+marsh_borders = [
+    [["*", "_",   "*",
+     "_", MARSH, MARSH,
+     "*", MARSH,   "*"],
+     MARSH_NW],
+
+    [["*", "_",   "*",
+     MARSH, MARSH, "_",
+       "*", MARSH,   "*"],
+     MARSH_NE],
+
+    [["*",  MARSH,   "*",
+     MARSH, MARSH, "_",
+       "*", "_",   "*"],
+     MARSH_SE],
+
+    [["*",  MARSH,   "*",
+      "_",  MARSH, MARSH,
+      "*", "_",   "*"],
+     MARSH_SW],
+]
+
+grass_borders = [
+    [["*", "_",   "*",
+     "_", GRASS, GRASS,
+     "*", GRASS,   "*"],
+     GRASS_NW],
+
+    [["*", "_",   "*",
+     GRASS, GRASS, "_",
+       "*", GRASS,   "*"],
+     GRASS_NE],
+
+    [["*",  GRASS,   "*",
+     GRASS, GRASS, "_",
+       "*", "_",   "*"],
+     GRASS_SE],
+
+    [["*",  GRASS,   "*",
+      "_",  GRASS, GRASS,
+      "*", "_",   "*"],
+     GRASS_SW],
+]
+
+forest_borders = [
+    [["*", "*",       "*",
+      "*", FOREST,  "_",
+      "*",       "_", "*"],
+     FOREST_SE],
+
+    [["*", "*",       "*",
+      "_", FOREST,  "*",
+      "*",       "_", "*"],
+     FOREST_SW],
+
+    [["*", "_",       "*",
+      "_", FOREST,  "*",
+      "*",       "*", "*"],
+     FOREST_NW],
+
+    [["*", "_",       "*",
+      "*", FOREST,  "_",
+      "*",       "*", "*"],
+     FOREST_NE],
+
+
+    [["*", "*",       "*",
+      "*", FOREST,  "_",
+      "*",       "*", "*"],
+     FOREST_E],
+
+    [["*", "*",       "*",
+      "_", FOREST,  "*",
+      "*",       "*", "*"],
+     FOREST_W],
+
+    [["*", "_",       "*",
+      "*", FOREST,  "*",
+      "*",       "*", "*"],
+     FOREST_N],
+
+    [["*", "*",       "*",
+      "*", FOREST,  "*",
+      "*",       "_", "*"],
+     FOREST_S],
+]
