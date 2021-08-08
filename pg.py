@@ -386,28 +386,23 @@ def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
 
 
 def splat(tilemap, x, y, biometype):
-    #sz = random.randint(150, 300)
-    sz = 400
+    sz = random.randint(200, 400)
 
     pending = [(x, y)]
 
     while sz > 0 and pending:
-        x, y = pending.pop(0)
+        x, y = pending.pop(random.randint(0, len(pending)-1))
+
+        if tilemap[y][x] not in [LAND, RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE]:
+            continue
 
         if tilemap[y][x] == LAND:
             tilemap[y][x] = biometype
-            sz -= 1
-        else:
-            continue
+        sz -= 1
 
-        #directions = random.randint(1, 15)
-        #if directions & 8:
         pending.append((x-1, y))
-        #if directions & 4:
         pending.append((x+1, y))
-        #if directions & 2:
         pending.append((x, y-1))
-        #if directions & 1:
         pending.append((x, y+1))
 
 
@@ -442,7 +437,7 @@ def add_biomes(tilemap, landregions):
 
     biomes = [LAND, FOREST, GRASS, MARSH, DESERT]
     for r in landregions:
-        for i in range(0, len(r.points)//100 + 1):
+        for i in range(0, len(r.points)//50 + 1):
             b = random.randint(0, len(biomes)-1)
             pts = list(r.points)
             p = random.randint(0, len(pts)-1)
