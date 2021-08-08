@@ -1,253 +1,265 @@
 from ff1tiles import *
 
 expand_mountains = [
-    ["M__"
-     "___"
-     "___",
-     "M"],
-    ["_M_"
-     "___"
-     "___",
-     "M"],
-    ["__M"
-     "___"
-     "___",
-     "M"],
-    ["___"
-     "M__"
-     "___",
-     "M"],
-    ["___"
-     "__M"
-     "___",
-     "M"],
-    ["___"
-     "___"
-     "M__",
-     "M"],
-    ["___"
-     "___"
-     "_M_",
-     "M"],
-    ["___"
-     "___"
-     "__M",
-     "M"]
+    [[MOUNTAIN, "_", "_",
+      "_", "_", "_",
+      "_", "_", "_"],
+     MOUNTAIN],
+    [["_", MOUNTAIN, "_",
+      "_", "_", "_",
+      "_", "_", "_"],
+     MOUNTAIN],
+    [["_", "_", MOUNTAIN,
+      "_", "_", "_",
+      "_", "_", "_"],
+     MOUNTAIN],
+
+    [["_", "_", "_",
+      MOUNTAIN, "_", "_",
+      "_", "_", "_"],
+     MOUNTAIN],
+    [["_", "_", "_",
+      "_", MOUNTAIN, "_",
+      "_", "_", "_"],
+     MOUNTAIN],
+    [["_", "_", "_",
+      "_", "_", MOUNTAIN,
+      "_", "_", "_"],
+     MOUNTAIN],
+
+    [["_", "_", "_",
+      "_", "_", "_",
+      MOUNTAIN, "_", "_"],
+     MOUNTAIN],
+    [["_", "_", "_",
+      "_", "_", "_",
+      "_", MOUNTAIN, "_"],
+     MOUNTAIN],
+    [["_", "_", "_",
+      "_", "_", "_",
+      "_", "_", MOUNTAIN],
+     MOUNTAIN],
 ]
 
+expand_oceans = [
+    [[OCEAN, "_", "_",
+      "_", "_", "_",
+      "_", "_", "_"],
+     OCEAN],
+    [["_", OCEAN, "_",
+      "_", "_", "_",
+      "_", "_", "_"],
+     OCEAN],
+    [["_", "_", OCEAN,
+      "_", "_", "_",
+      "_", "_", "_"],
+     OCEAN],
 
-expand_sea = [
-    [".__"
-     "___"
-     "___",
-     "."],
-    ["_._"
-     "___"
-     "___",
-     "."],
-    ["__."
-     "___"
-     "___",
-     "."],
-    ["___"
-     ".__"
-     "___",
-     "."],
-    ["___"
-     "__."
-     "___",
-     "."],
-    ["___"
-     "___"
-     ".__",
-     "."],
-    ["___"
-     "___"
-     "_._",
-     "."],
-    ["___"
-     "___"
-     "__.",
-     "."]
-]
+    [["_", "_", "_",
+      OCEAN, "_", "_",
+      "_", "_", "_"],
+     OCEAN],
+    [["_", "_", "_",
+      "_", OCEAN, "_",
+      "_", "_", "_"],
+     OCEAN],
+    [["_", "_", "_",
+      "_", "_", OCEAN,
+      "_", "_", "_"],
+     OCEAN],
 
-smooth_rivers = [
-    ["_=_"
-     "M=M"
-     "MMM",
-     "M"],
-    ["MM_"
-     "M=="
-     "MM_",
-     "M"],
-    ["MMM"
-     "M=M"
-     "_=_",
-     "M"],
-    ["_MM"
-     "==M"
-     "_MM",
-     "M"],
-    ["_=_"
-     "#=#"
-     "###",
-     "#"],
-    ["##_"
-     "#=="
-     "##_",
-     "#"],
-    ["###"
-     "#=#"
-     "_=_",
-     "#"],
-    ["_##"
-     "==#"
-     "_##",
-     "#"],
-    ["_M_"
-     "=M="
-     "===",
-     "="],
-    ["==_"
-     "=MM"
-     "==_",
-     "="],
-    ["==="
-     "=M="
-     "_M_",
-     "="],
-    ["_=="
-     "MM="
-     "_==",
-     "="],
-]
-
-fixup_mountains = [
-    [["*", "_", "*",
-      "_", "M", "_",
-      "*", "*", "*"],
-     "#"],
-    [["*", "_", "*",
-      "*", "M", "_",
-      "*", "_", "*"],
-     "#"],
-    [["*", "*", "*",
-      "_", "M", "_",
-      "*", "_", "*"],
-     "#"],
-    [["*", "_", "*",
-      "_", "M", "*",
-      "*", "_", "*"],
-     "#"],
+    [["_", "_", "_",
+      "_", "_", "_",
+      OCEAN, "_", "_"],
+     OCEAN],
+    [["_", "_", "_",
+      "_", "_", "_",
+      "_", OCEAN, "_"],
+     OCEAN],
+    [["_", "_", "_",
+      "_", "_", "_",
+      "_", "_", OCEAN],
+     OCEAN],
 ]
 
 connect_diagonals = [
-    ["*=_"
-     "*_="
-     "***",
-     "="],
-    ["_=*"
-     "=_*"
-     "***",
-     "="],
-    ["*._"
-     "*_."
-     "***",
-     "."],
-    ["_.*"
-     "._*"
-     "***",
-     "."],
-    ["*M_"
-     "*_M"
-     "***",
-     "M"],
-    ["_M*"
-     "M_*"
-     "***",
-     "M"],
+    [["*", RIVER, "_",
+     "*", "_", RIVER,
+     "*", "*", "*"],
+     RIVER],
+    [["_", RIVER, "*",
+     RIVER, "_", "*",
+     "*", "*", "*"],
+     RIVER],
+    [["*", OCEAN, "_",
+     "*", "_", OCEAN,
+     "*", "*", "*"],
+     OCEAN],
+    [["_", OCEAN, "*",
+     OCEAN, "_", "*",
+     "*", "*", "*"],
+     OCEAN],
+    [["*", MOUNTAIN, "_",
+     "*", "_", MOUNTAIN,
+     "*", "*", "*"],
+     MOUNTAIN],
+    [["_", MOUNTAIN, "*",
+     MOUNTAIN, "_", "*",
+     "*", "*", "*"],
+     MOUNTAIN],
 ]
 
+smooth_rivers = [
+    [["_",      RIVER,    "_",
+     MOUNTAIN, RIVER,    MOUNTAIN,
+     MOUNTAIN, MOUNTAIN, MOUNTAIN],
+     MOUNTAIN],
+    [[MOUNTAIN, MOUNTAIN, "_",
+     MOUNTAIN, RIVER,    RIVER,
+     MOUNTAIN, MOUNTAIN, "_"],
+     MOUNTAIN],
+    [[MOUNTAIN, MOUNTAIN, MOUNTAIN,
+     MOUNTAIN, RIVER,    MOUNTAIN,
+     "_",      RIVER,    "_"],
+     MOUNTAIN],
+    [["_",   MOUNTAIN, MOUNTAIN,
+     RIVER, RIVER,    MOUNTAIN,
+     "_",   MOUNTAIN, MOUNTAIN],
+     MOUNTAIN],
+    [["_",  RIVER, "_",
+     LAND, RIVER, LAND,
+     LAND, LAND,  LAND],
+     LAND],
+    [[LAND, LAND, "_",
+     LAND, RIVER, RIVER,
+     LAND, LAND, "_"],
+     LAND],
+    [[LAND, LAND,  LAND,
+     LAND, RIVER, LAND,
+     "_",  RIVER, "_"],
+     LAND],
+    [["_",   LAND,  LAND,
+     RIVER, RIVER, LAND,
+     "_",   LAND,  LAND],
+     LAND],
+    [["_",   MOUNTAIN, "_",
+     RIVER, MOUNTAIN, RIVER,
+     RIVER, RIVER,    RIVER],
+     RIVER],
+    [[RIVER, RIVER,    "_",
+     RIVER, MOUNTAIN, MOUNTAIN,
+     RIVER, RIVER,    "_"],
+     RIVER],
+    [[RIVER, RIVER,    RIVER,
+     RIVER, MOUNTAIN, RIVER,
+     "_",   MOUNTAIN, "_"],
+     RIVER],
+    [["_",      RIVER,    RIVER,
+     MOUNTAIN, MOUNTAIN, RIVER,
+     "_",      RIVER,    RIVER],
+     RIVER],
+]
+
+fixup_mountains = [
+    [["*", "_",      "*",
+      "_", MOUNTAIN, "_",
+      "*", "*",      "*"],
+     LAND],
+    [["*", "_",      "*",
+      "*", MOUNTAIN, "_",
+      "*", "_",      "*"],
+     LAND],
+    [["*", "*",      "*",
+      "_", MOUNTAIN, "_",
+      "*", "_",      "*"],
+     LAND],
+    [["*", "_",      "*",
+      "_", MOUNTAIN, "*",
+      "*", "_",      "*"],
+     LAND],
+]
+
+
 apply_shores1 = [
-    [["*", "*", "*",
-      "*", SEA, LAND,
-      "*", LAND, "*"],
+    [["*", "*",   "*",
+      "*", OCEAN, LAND,
+      "*", LAND,  "*"],
      SHORE_NW],
 
-    [["*", "*",  "*",
-      LAND, SEA, "*",
-      "*", LAND, "*"],
+    [["*", "*",    "*",
+      LAND, OCEAN, "*",
+      "*", LAND,   "*"],
      SHORE_NE],
 
     [["*",  LAND,  "*",
-      LAND, SEA, "*",
-      "*",  "*", "*"],
+      LAND, OCEAN, "*",
+      "*",  "*",   "*"],
      SHORE_SE],
 
-    [["*", LAND, "*",
-      "*", SEA,  LAND,
-      "*",  "*", "*"],
+    [["*", LAND,   "*",
+      "*", OCEAN,  LAND,
+      "*",  "*",   "*"],
      SHORE_SW],
 ]
 
 apply_shores2 = [
-    [["*", SEA,  "*",
-      "*", LAND, SEA,
-      "*", SEA, "*"],
+    [["*", OCEAN,  "*",
+      "*", LAND,   OCEAN,
+      "*", OCEAN,  "*"],
      LAND],
 
-    [["*", "*",  "*",
-      SEA, LAND, SEA,
-      "*", SEA, "*"],
+    [["*", "*",    "*",
+      OCEAN, LAND, OCEAN,
+      "*", OCEAN,  "*"],
      LAND],
 
-    [["*", SEA,  "*",
-      SEA, LAND, "*",
-      "*", SEA, "*"],
+    [["*", OCEAN,  "*",
+      OCEAN, LAND, "*",
+      "*", OCEAN,  "*"],
      LAND],
 
-    [["*", SEA,  "*",
-      SEA, LAND, SEA,
-      "*", "*", "*"],
+    [["*", OCEAN,  "*",
+      OCEAN, LAND, OCEAN,
+      "*", "*",    "*"],
      LAND],
 
-    [["*", "*",  "*",
-      "*", LAND, SEA,
-      "*", SEA, "*"],
+    [["*", "*",   "*",
+      "*", LAND,  OCEAN,
+      "*", OCEAN, "*"],
      SHORE_SE],
 
-    [["*", "*",  "*",
-      SEA, LAND, "*",
-      "*", SEA, "*"],
+    [["*", "*",    "*",
+      OCEAN, LAND, "*",
+      "*", OCEAN,  "*"],
      SHORE_SW],
 
-    [["*", SEA,  "*",
-      SEA, LAND, "*",
-      "*", "*", "*"],
+    [["*", OCEAN,  "*",
+      OCEAN, LAND, "*",
+      "*", "*",    "*"],
      SHORE_NW],
 
-    [["*", SEA,  "*",
-      "*", LAND, SEA,
-      "*", "*", "*"],
+    [["*", OCEAN,  "*",
+      "*", LAND,   OCEAN,
+      "*", "*",    "*"],
      SHORE_NE],
 ]
 
 apply_shores3 = [
-    [["*", "*", "*",
-      "*", SEA, LAND,
-      "*", "*", "*"],
+    [["*", "*",   "*",
+      "*", OCEAN, LAND,
+      "*", "*",   "*"],
      SHORE_W],
-    [["*",  "*", "*",
-      LAND, SEA, "*",
-      "*",  "*", "*"],
+    [["*",  "*",   "*",
+      LAND, OCEAN, "*",
+      "*",  "*",   "*"],
      SHORE_E],
-    [["*", "*", "*",
-      "*", SEA, "*",
-      "*", LAND, "*"],
+    [["*", "*",   "*",
+      "*", OCEAN, "*",
+      "*", LAND,  "*"],
      SHORE_N],
-    [["*", LAND, "*",
-      "*", SEA,  "*",
-      "*", "*",  "*",],
+    [["*", LAND,   "*",
+      "*", OCEAN,  "*",
+      "*", "*",    "*",],
      SHORE_S],
 ]
 

@@ -93,8 +93,31 @@ def check_rule(tilemap, rule, x, y, multi):
                 return False
     return rule[1]
 
+def check_salient(tilemap, rule, x, y, multi):
+    counts = {}
+    for t in [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]:
+        tile = tilemap[t[1]][t[0]]
+        if tile in counts:
+            counts[tile] += 1
+        else:
+            counts[tile] = 1
 
-def apply_filter(tilemap, rules, multi, repeat):
+    tile = tilemap[y][x]
+
+    for k,v in counts.items():
+        if (v == 3 or v == 4) and k != tile:
+            # Surrounded on 3 or 4 sides, convert to the tile type
+            # surrounding it
+            return k
+
+    if tile in (MOUNTAIN, FOREST):
+        if counts.get(tile, 0) < 2:
+            return LAND
+
+    return False
+
+
+def apply_filter(tilemap, rules, multi, repeat, matcher=check_rule):
     recur = True
     while recur:
         newtilemap = []
@@ -110,7 +133,7 @@ def apply_filter(tilemap, rules, multi, repeat):
                     continue
                 rep = tilemap[y][x]
                 for rule in rules:
-                    check = check_rule(tilemap, rule, x, y, multi)
+                    check = matcher(tilemap, rule, x, y, multi)
                     if check is not False:
                         rep = check
                         any_rule_matched = True
@@ -120,6 +143,7 @@ def apply_filter(tilemap, rules, multi, repeat):
         recur = repeat and any_rule_matched
 
     return tilemap
+
 
 def savemap(tilemap, colormap, filename):
     img = PIL.Image.new("RGB", (map_size, map_size))
@@ -176,11 +200,40 @@ class Region:
     def __repr__(self):
         return "<'%s' %s %s>" % (self.tile, self.points, self.adjacent)
 
+LAND_REGION = 0
+GRASS_REGION = 1
+MARSH_REGION = 2
+MOUNTAIN_REGION = 3
+OCEAN_REGION = 4
+RIVER_REGION = 5
+FOREST_REGION = 6
+DESERT_REGION = 7
+
+region_types = [
+    [LAND, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
+    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
+    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
+    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+     MOUNTAIN_W, MOUNTAIN_E,
+     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S],
+    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
+    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
+     FOREST_W, FOREST_E,
+     FOREST_SW, FOREST_S, FOREST_SE],
+    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
+]
+
+tile_region_type = {}
+for j,r in enumerate(region_types):
+    for i in r:
+        tile_region_type[i] = j
+
 def find_regions(tilemap):
     regionmap = []
     for x in range(0, map_size):
         regionmap.append([None] * map_size)
-    regionlist = [Region('.', 0)]
+    regionlist = [Region(OCEAN_REGION, 0)]
 
     working_stack = [(0, 0, 0)]
     pending = []
@@ -194,12 +247,12 @@ def find_regions(tilemap):
 
             regionmap[y][x] = current_region
             regionlist[current_region].addpoint(x, y)
-            curtile = tilemap[y][x]
+            curtile = tile_region_type[tilemap[y][x]]
 
             adjacent = [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
             for ab in adjacent:
                 if ab[0] >= 0 and ab[0] <= (map_size-1) and ab[1] >= 0 and ab[1] <= (map_size-1):
-                    next_tile = tilemap[ab[1]][ab[0]]
+                    next_tile = tile_region_type[tilemap[ab[1]][ab[0]]]
                     if next_tile == curtile:
                         working_stack.append((ab[0], ab[1], current_region))
                     else:
@@ -208,7 +261,7 @@ def find_regions(tilemap):
         while pending and not working_stack:
             x, y, current_region = pending.pop(0)
             if regionmap[y][x] is None:
-                regionlist.append(Region(tilemap[y][x], len(regionlist)))
+                regionlist.append(Region(tile_region_type[tilemap[y][x]], len(regionlist)))
                 next_region = len(regionlist)-1
                 working_stack.append((x, y, next_region))
             elif regionmap[y][x] != current_region:
@@ -233,7 +286,7 @@ def remove_small_regions(tilemap, regionlist):
         if len(r.points) > 5:
             continue
 
-        repl = [regionlist[adj].tile for adj in r.adjacent]
+        repl = [region_types[regionlist[adj].tile][0] for adj in r.adjacent]
         random.shuffle(repl)
         for p in r.points:
             tilemap[p[1]][p[0]] = repl[0]
@@ -246,24 +299,24 @@ def remove_small_islands(tilemap, regionlist):
             continue
         if len(r.adjacent) == 1:
             adj = list(r.adjacent)[0]
-            if regionlist[adj].tile == '.':
+            if regionlist[adj].tile == OCEAN_REGION:
                 candidates.append(r)
 
     random.shuffle(candidates)
 
     for r in candidates[:len(candidates)-4]:
         for p in r.points:
-            tilemap[p[1]][p[0]] = '.'
+            tilemap[p[1]][p[0]] = OCEAN
 
 
 def small_seas_become_lakes(tilemap, regionlist):
     for r in regionlist:
-        if r.tile != '.':
+        if r.tile != OCEAN:
             continue
         if len(r.points) > 40:
             continue
         for p in r.points:
-            tilemap[p[1]][p[0]] = '='
+            tilemap[p[1]][p[0]] = RIVER
 
 def flow_river(basemap, tilemap, pending):
     volume = 256
@@ -271,15 +324,15 @@ def flow_river(basemap, tilemap, pending):
     while pending and volume > 0:
         x, y = pending.pop()
 
-        if tilemap[y][x] == '.':
+        if tilemap[y][x] == OCEAN:
             break
 
         volume -= 1
 
-        if tilemap[y][x] == '=':
+        if tilemap[y][x] == RIVER:
             continue
 
-        tilemap[y][x] = '='
+        tilemap[y][x] = RIVER
 
         pending.extend([(x+1, y), (x, y+1), (x-1, y), (x, y-1)])
         pending.sort(key=lambda ab: basemap[ab[1]][ab[0]], reverse=True)
@@ -437,145 +490,25 @@ def add_biomes(tilemap, landregions):
 
     biomes = [LAND, FOREST, GRASS, MARSH, DESERT]
     for r in landregions:
-        for i in range(0, len(r.points)//50 + 1):
+        for i in range(0, len(r.points)//100 + 1):
             b = random.randint(0, len(biomes)-1)
             pts = list(r.points)
             p = random.randint(0, len(pts)-1)
             splat(tilemap, pts[p][0], pts[p][1], biomes[b])
 
-    all_tiles = set(ALL_TILES)
-    non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
-    non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
-    non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
-    non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
-                                             FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
-    tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, marsh_borders, {"_": non_marsh_tiles, "*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, grass_borders, {"_": non_grass_tiles, "*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
+    # all_tiles = set(ALL_TILES)
+    # non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
+    # non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
+    # non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
+    # non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
+    #                                          FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
+    # tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
+    # tilemap = apply_filter(tilemap, marsh_borders, {"_": non_marsh_tiles, "*": all_tiles}, False)
+    # tilemap = apply_filter(tilemap, grass_borders, {"_": non_grass_tiles, "*": all_tiles}, False)
+    # tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
     return tilemap
 
-
-def procgen():
-    basemap = []
-    for x in range(0, map_size):
-        basemap.append([None] * map_size)
-
-    border = 8
-    for b in range(0, border+1):
-        for i in range(0, map_size):
-            basemap[b][i] = 0
-            basemap[map_size-1-b][i] = 0
-            basemap[i][b] = 0
-            basemap[i][map_size-1-b] = 0
-    basemap[map_size//2-1][map_size//2-1] = 0
-
-    perturb_point(basemap, border, border, map_size-1-border, map_size-1-border, 1)
-
-    tilemap = []
-    for x in range(0, map_size):
-        tilemap.append(['.'] * map_size)
-
-    heightmin = 100
-    heightmax = -100
-    avg = 0
-
-    for y,row in enumerate(basemap):
-        for x,tile in enumerate(row):
-            if basemap[y][x] < heightmin:
-                heightmin = basemap[y][x]
-            if basemap[y][x] > heightmax:
-                heightmax = basemap[y][x]
-            avg += basemap[y][x]
-
-    avg = avg / (map_size*map_size)
-
-    mountain_elevation = 1-mountain_pct
-    sea_elevation = 1-land_pct
-
-    mountain_count = 0
-    land_count = 0
-    min_land_tiles = (map_size*map_size)*land_pct
-    min_mtn_tiles = (map_size*map_size)*mountain_pct
-
-    print("min_land_tiles", min_land_tiles)
-    print("min_mtn_tiles", min_mtn_tiles)
-
-    lowering_iter = 0
-    while land_count < min_land_tiles or mountain_count < min_mtn_tiles:
-        lowering_iter += 1
-        mountain_count = 0
-        land_count = 0
-        for y,row in enumerate(basemap):
-            for x,tile in enumerate(row):
-                if tile > mountain_elevation:
-                    tilemap[y][x] = 'M'
-                    mountain_count += 1
-                elif tile > sea_elevation:
-                    tilemap[y][x] = '#'
-                    land_count += 1
-                else:
-                    tilemap[y][x] = '.'
-        if land_count < min_land_tiles:
-            sea_elevation -= .005
-        if mountain_count < min_mtn_tiles:
-            mountain_elevation -= .005
-        if sea_elevation <= 0:
-            return False
-
-    print("sea_elevation", sea_elevation)
-    print("mountain_elevation", mountain_elevation)
-
-    print("Lowering iterations", lowering_iter)
-
-    colormap = {".": (101, 183, 255),
-                "=": (178, 229, 255),
-                "#": (52, 176, 0),
-                "M": (255, 255, 255)}
-
-    savemap(tilemap, colormap, "map1.png")
-
-    all_simple_tiles = ["#", ".", "=", "M"]
-
-    print("expanding mountains")
-    tilemap = apply_filter(tilemap, expand_mountains, {"_": ["#", ".", "M"], "*": all_simple_tiles}, False)
-
-    print("expanding sea")
-    tilemap = apply_filter(tilemap, expand_sea, {"_": ["#", ".", "M"], "*": all_simple_tiles}, False)
-
-    points = []
-    for y,row in enumerate(basemap):
-        for x,tile in enumerate(row):
-            if tile >= (mountain_elevation + ((heightmax-mountain_elevation)*.5)):
-                points.append((x,y))
-
-    print("flowing rivers")
-    random.shuffle(points)
-    for p in points[:16]:
-        flow_river(basemap, tilemap, [p])
-
-    tilemap = apply_filter(tilemap, connect_diagonals, {"_": ["M", "#"], "*": all_simple_tiles}, False)
-
-    print("removing small regions")
-    regionmap, regionlist = find_regions(tilemap)
-    remove_small_regions(tilemap, regionlist)
-
-    print("smoothing rivers")
-    tilemap = apply_filter(tilemap, smooth_rivers, {"_": ["M", "=", "#"], "*": all_simple_tiles}, True)
-    tilemap = apply_filter(tilemap, fixup_mountains, {"_": ["#", "=", "."], "*": all_simple_tiles}, False)
-
-    regionmap, regionlist = find_regions(tilemap)
-    remove_small_regions(tilemap, regionlist)
-
-    regionmap, regionlist = find_regions(tilemap)
-    remove_small_islands(tilemap, regionlist)
-
-    regionmap, regionlist = find_regions(tilemap)
-    small_seas_become_lakes(tilemap, regionlist)
-
-    savemap(tilemap, colormap, "map5.png")
-
-    tilemap = to_ffm(tilemap)
+def place_features(tilemap):
 
     regionmap, regionlist = find_regions(tilemap)
 
@@ -636,22 +569,161 @@ def procgen():
                 found = True
             maxweight += 1
 
+
+def procgen():
+    basemap = []
+    for x in range(0, map_size):
+        basemap.append([None] * map_size)
+
+    border = 8
+    for b in range(0, border+1):
+        for i in range(0, map_size):
+            basemap[b][i] = 0
+            basemap[map_size-1-b][i] = 0
+            basemap[i][b] = 0
+            basemap[i][map_size-1-b] = 0
+    basemap[map_size//2-1][map_size//2-1] = 0
+
+    perturb_point(basemap, border, border, map_size-1-border, map_size-1-border, 1)
+
+    tilemap = []
+    for x in range(0, map_size):
+        tilemap.append([OCEAN] * map_size)
+
+    heightmin = 100
+    heightmax = -100
+    avg = 0
+
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if basemap[y][x] < heightmin:
+                heightmin = basemap[y][x]
+            if basemap[y][x] > heightmax:
+                heightmax = basemap[y][x]
+            avg += basemap[y][x]
+
+    avg = avg / (map_size*map_size)
+
+    mountain_elevation = 1-mountain_pct
+    sea_elevation = 1-land_pct
+
+    mountain_count = 0
+    land_count = 0
+    min_land_tiles = (map_size*map_size)*land_pct
+    min_mtn_tiles = (map_size*map_size)*mountain_pct
+
+    print("min_land_tiles", min_land_tiles)
+    print("min_mtn_tiles", min_mtn_tiles)
+
+    lowering_iter = 0
+    while land_count < min_land_tiles or mountain_count < min_mtn_tiles:
+        lowering_iter += 1
+        mountain_count = 0
+        land_count = 0
+        for y,row in enumerate(basemap):
+            for x,tile in enumerate(row):
+                if tile > mountain_elevation:
+                    tilemap[y][x] = MOUNTAIN
+                    mountain_count += 1
+                elif tile > sea_elevation:
+                    tilemap[y][x] = LAND
+                    land_count += 1
+                else:
+                    tilemap[y][x] = OCEAN
+        if land_count < min_land_tiles:
+            sea_elevation -= .005
+        if mountain_count < min_mtn_tiles:
+            mountain_elevation -= .005
+        if sea_elevation <= 0:
+            return False
+
+    print("sea_elevation", sea_elevation)
+    print("mountain_elevation", mountain_elevation)
+
+    print("Lowering iterations", lowering_iter)
+
+    colormap = {OCEAN: (101, 183, 255),
+                RIVER: (178, 229, 255),
+                LAND: (52, 176, 0),
+                MOUNTAIN: (255, 255, 255)}
+
+    savemap(tilemap, colormap, "map1.png")
+
+    all_simple_tiles = (MOUNTAIN, OCEAN, RIVER, LAND)
+
+    print("expanding mountains")
+    tilemap = apply_filter(tilemap, expand_mountains, {"_": (LAND, OCEAN, MOUNTAIN)}, False)
+
+    print("expanding oceans")
+    tilemap = apply_filter(tilemap, expand_oceans, {"_": (LAND, OCEAN, MOUNTAIN)}, False)
+
+    points = []
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if tile >= (mountain_elevation + ((heightmax-mountain_elevation)*.5)):
+                points.append((x,y))
+
+    print("flowing rivers")
+    random.shuffle(points)
+    for p in points[:16]:
+        flow_river(basemap, tilemap, [p])
+
+    tilemap = apply_filter(tilemap, connect_diagonals, {"_": (MOUNTAIN, LAND),
+                                                        "*": all_simple_tiles}, False)
+
+    print("removing small islands")
+    regionmap, regionlist = find_regions(tilemap)
+    remove_small_islands(tilemap, regionlist)
+
+    print("Adding biomes")
+    regionmap, regionlist = find_regions(tilemap)
+    landregions = [r for r in regionlist if r.tile == LAND]
+    tilemap = add_biomes(tilemap, landregions)
+
+    for i in range(0, 3):
+        print("removing small regions")
+        regionmap, regionlist = find_regions(tilemap)
+        remove_small_regions(tilemap, regionlist)
+
+        print("Removing salients")
+        tilemap = apply_filter(tilemap, [None], None, True, matcher=check_salient)
+
+    # print("smoothing rivers")
+    # tilemap = apply_filter(tilemap, smooth_rivers,   {"_": (MOUNTAIN, RIVER, LAND), "*": all_simple_tiles}, True)
+    # tilemap = apply_filter(tilemap, fixup_mountains, {"_": (LAND, RIVER, OCEAN), "*": all_simple_tiles}, False)
+
+    # print("removing small regions (2nd pass)")
+    # regionmap, regionlist = find_regions(tilemap)
+    # remove_small_regions(tilemap, regionlist)
+
+
+    print("small seas become lakes")
+    regionmap, regionlist = find_regions(tilemap)
+    small_seas_become_lakes(tilemap, regionlist)
+
+    print("Saving map5.ffm")
+    #savemap(tilemap, colormap, "map5.png")
+    saveffm(tilemap, "map5.ffm")
+
+    return True
+
+    #tilemap = to_ffm(tilemap)
+
+    #place_features(tilemap)
+
     all_tiles = set(ALL_TILES)
 
     tilemap = apply_filter(tilemap, mountain_borders, {"_": [SEA, RIVER, LAND], "*": all_tiles}, False)
     tilemap = apply_filter(tilemap, river_borders, {"_": [SEA, LAND,
-                                                       MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
-                                                       MOUNTAIN_W, MOUNTAIN, MOUNTAIN_E,
-                                                       MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+                                                          MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+                                                          MOUNTAIN_W,  MOUNTAIN,   MOUNTAIN_E,
+                                                          MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
                                                     "*": all_tiles},
                            False)
 
     tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles}, False)
-
-
-    tilemap = add_biomes(tilemap, landregions)
 
 
     # single tile features
@@ -673,14 +745,6 @@ def procgen():
     # canal
     # airship desert
 
-    # x = 8
-    # y = 8
-    # for i,_ in enumerate(features):
-    #     render_feature(tilemap, features[i], x, y)
-    #     x += 8
-    #     if x > 255:
-    #         y += 8
-    #         x = 8
 
     saveffm(tilemap, "map5.ffm")
     with open("map5.json", "w") as f:
