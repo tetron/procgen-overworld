@@ -571,7 +571,7 @@ def place_features(tilemap):
 
     random.shuffle(features)
 
-    landregions = [r for r in regionlist if r.tile == LAND]
+    landregions = [r for r in regionlist if r.tile in (LAND_REGION, GRASS_REGION, MARSH_REGION, FOREST_REGION, DESERT_REGION)]
     landregions.sort(key=lambda r: len(r.points), reverse=True)
     total = 0
     for r in landregions:
