@@ -97,9 +97,9 @@ def check_rule(tilemap, rule, x, y, multi):
 
 
 def check_salient(tile_region_type, tilemap, rule, x, y, multi):
-    if tilemap[y][x] in (SHORE_NW, SHORE_N, SHORE_NE,
-                         SHORE_W, OCEAN, SHORE_E,
-                         SHORE_SW, SHORE_S, SHORE_SE, LAND):
+    tile = tile_region_type[tilemap[y][x]]
+
+    if tile in (LAND_REGION, OCEAN_REGION, MISC_REGION):
         return False
 
     counts = {}
@@ -218,6 +218,7 @@ OCEAN_REGION = 4
 RIVER_REGION = 5
 FOREST_REGION = 6
 DESERT_REGION = 7
+MISC_REGION = 8
 
 region_types = [
     [LAND, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
@@ -232,12 +233,16 @@ region_types = [
      FOREST_W, FOREST_E,
      FOREST_SW, FOREST_S, FOREST_SE],
     [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
+    []
 ]
 
 tile_region_type = {}
 for j,r in enumerate(region_types):
     for i in r:
         tile_region_type[i] = j
+for i in ALL_TILES:
+    if i not in tile_region_type:
+        tile_region_type[i] = MISC_REGION
 
 alt_region_types = [
     [LAND],
@@ -245,7 +250,8 @@ alt_region_types = [
     [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
     [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
      MOUNTAIN_W, MOUNTAIN_E,
-     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE,
+     EARTH_CAVE, ICE_CAVE, DWARF_CAVE, MATOYAS_CAVE, SARDAS_CAVE, TITAN_CAVE_E, TITAN_CAVE_W],
     [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
     [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
     [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
@@ -257,6 +263,10 @@ alt_tile_region_type = {}
 for j,r in enumerate(alt_region_types):
     for i in r:
         alt_tile_region_type[i] = j
+for i in ALL_TILES:
+    if i not in alt_tile_region_type:
+        alt_tile_region_type[i] = MISC_REGION
+
 
 def find_regions(tilemap):
     regionmap = []
@@ -388,8 +398,8 @@ def render_feature(tilemap, regionmap, weightmap, feature, x, y):
                 weightmap[y2][x2] += (radius - dist)
 
 def place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, feature):
-    h = len(feature)+2
-    w = len(feature[0])+2
+    h = len(feature)
+    w = len(feature[0])
 
     candidates = set()
 
@@ -417,8 +427,8 @@ def place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, feature
     if weightmap[candidates[0][1]+(h//2)][candidates[0][0]+(w//2)] > maxweight:
         return False
 
-    render_feature(tilemap, regionmap, weightmap, feature, candidates[0][0]+1, candidates[0][1]+1)
-    return (candidates[0][0]+1, candidates[0][1]+1)
+    render_feature(tilemap, regionmap, weightmap, feature, candidates[0][0], candidates[0][1])
+    return (candidates[0][0], candidates[0][1])
 
 
 def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
@@ -434,7 +444,7 @@ def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
                     fits = False
                     break
             for x2 in range(x-1, x+2):
-                if tilemap[y][x2] != LAND:
+                if tilemap[y][x2] not in (LAND, MARSH, FOREST, DESERT, GRASS):
                     fits = False
                     break
             if fits:
@@ -532,7 +542,7 @@ def apply_borders(tilemap):
     non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
     non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
                                              FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
-    non_mountain_tiles = all_tiles.difference([MOUNTAIN])
+    non_mountain_tiles = all_tiles.difference([MOUNTAIN, EARTH_CAVE, ICE_CAVE, DWARF_CAVE, MATOYAS_CAVE, SARDAS_CAVE, TITAN_CAVE_E, TITAN_CAVE_W])
     non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W])
 
     tilemap = apply_filter(tilemap, mountain_borders, {"_": non_mountain_tiles, "*": all_tiles}, False)
@@ -592,7 +602,7 @@ def place_features(tilemap):
                     starting_location = (loc[0]+3, loc[1]+7)
             maxweight += 1
 
-    caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_E, TITAN_W, SARDAS_CAVE, ICE_CAVE]
+    caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_CAVE_E, TITAN_CAVE_W, SARDAS_CAVE, ICE_CAVE]
 
     print("Placing caves")
     for c in caves:
@@ -731,18 +741,13 @@ def procgen():
     regionmap, regionlist = find_regions(tilemap)
     small_seas_become_lakes(tilemap, regionlist)
 
-    #print("Saving map5.ffm")
-    #savemap(tilemap, colormap, "map5.png")
-    #saveffm(tilemap, "map5.ffm")
-
-    #place_features(tilemap)
+    place_features(tilemap)
 
     print("Applying borders")
     tilemap = apply_shores(tilemap)
 
     print("Removing salients")
     tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, alt_tile_region_type))
-
     tilemap = apply_borders(tilemap)
 
     starting_location = (0,0)
