@@ -557,6 +557,12 @@ def apply_borders(tilemap):
 
     return tilemap
 
+
+def pit_cave_feature(cave):
+    return [[None, None, None],
+            [None, cave, None],
+            [None, None, None]]
+
 def place_features(tilemap):
 
     regionmap, regionlist = find_regions(tilemap)
@@ -565,8 +571,10 @@ def place_features(tilemap):
                 ORDEALS_CASTLE, MELMOND_TOWN, ONRAC_TOWN,
                 LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
                 MIRAGE_TOWER, VOLCANO, OASIS,
-                [[MARSH_CAVE]], [[BAHAMUTS_CAVE]], [[CARDIA_1]], [[CARDIA_2]],
-                [[CARDIA_3]], [[CARDIA_4]], [[CARDIA_5]]
+                pit_cave_feature(MARSH_CAVE), pit_cave_feature(BAHAMUTS_CAVE),
+                pit_cave_feature(CARDIA_1), pit_cave_feature(CARDIA_2),
+                pit_cave_feature(CARDIA_3), pit_cave_feature(CARDIA_4),
+                pit_cave_feature(CARDIA_5)
     ]
 
     random.shuffle(features)
