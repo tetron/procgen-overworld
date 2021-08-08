@@ -1,6 +1,8 @@
 import random
 import math
 import json
+import functools
+
 import PIL.Image
 from ff1features import *
 from ff1filters import *
@@ -93,24 +95,32 @@ def check_rule(tilemap, rule, x, y, multi):
                 return False
     return rule[1]
 
-def check_salient(tilemap, rule, x, y, multi):
+
+def check_salient(tile_region_type, tilemap, rule, x, y, multi):
+    if tilemap[y][x] in (SHORE_NW, SHORE_N, SHORE_NE,
+                         SHORE_W, OCEAN, SHORE_E,
+                         SHORE_SW, SHORE_S, SHORE_SE, LAND):
+        return False
+
     counts = {}
     for t in [(x, y-1), (x, y+1), (x-1, y), (x+1, y)]:
-        tile = tilemap[t[1]][t[0]]
+        tile = tile_region_type[tilemap[t[1]][t[0]]]
         if tile in counts:
             counts[tile] += 1
         else:
             counts[tile] = 1
 
-    tile = tilemap[y][x]
+    tile = tile_region_type[tilemap[y][x]]
 
     for k,v in counts.items():
         if (v == 3 or v == 4) and k != tile:
             # Surrounded on 3 or 4 sides, convert to the tile type
             # surrounding it
-            return k
+            if k == OCEAN_REGION:
+                return LAND
+            return region_types[k][0]
 
-    if tile in (MOUNTAIN, FOREST):
+    if tile in (MOUNTAIN_REGION, FOREST_REGION):
         if counts.get(tile, 0) < 2:
             return LAND
 
@@ -229,6 +239,25 @@ for j,r in enumerate(region_types):
     for i in r:
         tile_region_type[i] = j
 
+alt_region_types = [
+    [LAND],
+    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
+    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
+    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+     MOUNTAIN_W, MOUNTAIN_E,
+     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
+    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
+    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
+     FOREST_W, FOREST_E,
+     FOREST_SW, FOREST_S, FOREST_SE],
+    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
+]
+alt_tile_region_type = {}
+for j,r in enumerate(alt_region_types):
+    for i in r:
+        alt_tile_region_type[i] = j
+
 def find_regions(tilemap):
     regionmap = []
     for x in range(0, map_size):
@@ -311,7 +340,7 @@ def remove_small_islands(tilemap, regionlist):
 
 def small_seas_become_lakes(tilemap, regionlist):
     for r in regionlist:
-        if r.tile != OCEAN:
+        if r.tile != OCEAN_REGION:
             continue
         if len(r.points) > 40:
             continue
@@ -337,19 +366,6 @@ def flow_river(basemap, tilemap, pending):
         pending.extend([(x+1, y), (x, y+1), (x-1, y), (x, y-1)])
         pending.sort(key=lambda ab: basemap[ab[1]][ab[0]], reverse=True)
         #print([(ab[0], ab[1], basemap[ab[1]][ab[0]]) for ab in pending])
-
-
-def to_ffm(tilemap):
-    to_tileid = {
-        ".": SEA,
-        "#": LAND,
-        "M": MOUNTAIN,
-        "=": RIVER,
-    }
-    for y,row in enumerate(tilemap):
-        for x,tile in enumerate(row):
-            tilemap[y][x] = to_tileid[tilemap[y][x]]
-    return tilemap
 
 
 def render_feature(tilemap, regionmap, weightmap, feature, x, y):
@@ -496,16 +512,39 @@ def add_biomes(tilemap, landregions):
             p = random.randint(0, len(pts)-1)
             splat(tilemap, pts[p][0], pts[p][1], biomes[b])
 
-    # all_tiles = set(ALL_TILES)
-    # non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
-    # non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
-    # non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
-    # non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
-    #                                          FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
-    # tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
-    # tilemap = apply_filter(tilemap, marsh_borders, {"_": non_marsh_tiles, "*": all_tiles}, False)
-    # tilemap = apply_filter(tilemap, grass_borders, {"_": non_grass_tiles, "*": all_tiles}, False)
-    # tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
+    return tilemap
+
+def apply_shores(tilemap):
+    all_tiles = set(ALL_TILES)
+    non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W])
+    non_ocean_shore_tiles = all_tiles.difference([OCEAN, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE, RIVER])
+    tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles, "_": non_water_tiles}, False)
+    tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles, "_": non_water_tiles}, False)
+    tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles, "_": non_ocean_shore_tiles}, False)
+
+    return tilemap
+
+def apply_borders(tilemap):
+    all_tiles = set(ALL_TILES)
+
+    non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
+    non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
+    non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
+    non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
+                                             FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
+    non_mountain_tiles = all_tiles.difference([MOUNTAIN])
+    non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W])
+
+    tilemap = apply_filter(tilemap, mountain_borders, {"_": non_mountain_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, river_borders, {"_": non_water_tiles,
+                                                    "*": all_tiles},
+                           False)
+
+    tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, marsh_borders,  {"_": non_marsh_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, grass_borders,  {"_": non_grass_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
+
     return tilemap
 
 def place_features(tilemap):
@@ -686,45 +725,27 @@ def procgen():
         remove_small_regions(tilemap, regionlist)
 
         print("Removing salients")
-        tilemap = apply_filter(tilemap, [None], None, True, matcher=check_salient)
-
-    # print("smoothing rivers")
-    # tilemap = apply_filter(tilemap, smooth_rivers,   {"_": (MOUNTAIN, RIVER, LAND), "*": all_simple_tiles}, True)
-    # tilemap = apply_filter(tilemap, fixup_mountains, {"_": (LAND, RIVER, OCEAN), "*": all_simple_tiles}, False)
-
-    # print("removing small regions (2nd pass)")
-    # regionmap, regionlist = find_regions(tilemap)
-    # remove_small_regions(tilemap, regionlist)
-
+        tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, tile_region_type))
 
     print("small seas become lakes")
     regionmap, regionlist = find_regions(tilemap)
     small_seas_become_lakes(tilemap, regionlist)
 
-    print("Saving map5.ffm")
+    #print("Saving map5.ffm")
     #savemap(tilemap, colormap, "map5.png")
-    saveffm(tilemap, "map5.ffm")
-
-    return True
-
-    #tilemap = to_ffm(tilemap)
+    #saveffm(tilemap, "map5.ffm")
 
     #place_features(tilemap)
 
-    all_tiles = set(ALL_TILES)
+    print("Applying borders")
+    tilemap = apply_shores(tilemap)
 
-    tilemap = apply_filter(tilemap, mountain_borders, {"_": [SEA, RIVER, LAND], "*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, river_borders, {"_": [SEA, LAND,
-                                                          MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
-                                                          MOUNTAIN_W,  MOUNTAIN,   MOUNTAIN_E,
-                                                          MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
-                                                    "*": all_tiles},
-                           False)
+    print("Removing salients")
+    tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, alt_tile_region_type))
 
-    tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles}, False)
-    tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles}, False)
+    tilemap = apply_borders(tilemap)
 
+    starting_location = (0,0)
 
     # single tile features
     #
@@ -744,7 +765,6 @@ def procgen():
     # bridge
     # canal
     # airship desert
-
 
     saveffm(tilemap, "map5.ffm")
     with open("map5.json", "w") as f:
