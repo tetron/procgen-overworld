@@ -118,7 +118,7 @@ def check_salient(tile_region_type, tilemap, rule, x, y, multi):
             # surrounding it
             if k == OCEAN_REGION:
                 return LAND
-            return region_types[k][0]
+            return pre_shore_region_types[k][0]
 
     if tile in (MOUNTAIN_REGION, FOREST_REGION):
         if counts.get(tile, 0) < 2:
@@ -210,65 +210,8 @@ class Region:
     def __repr__(self):
         return "<'%s' %s %s>" % (self.tile, self.points, self.adjacent)
 
-LAND_REGION = 0
-GRASS_REGION = 1
-MARSH_REGION = 2
-MOUNTAIN_REGION = 3
-OCEAN_REGION = 4
-RIVER_REGION = 5
-FOREST_REGION = 6
-DESERT_REGION = 7
-MISC_REGION = 8
 
-region_types = [
-    [LAND, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
-    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
-    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
-    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
-     MOUNTAIN_W, MOUNTAIN_E,
-     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
-    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S],
-    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
-    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
-     FOREST_W, FOREST_E,
-     FOREST_SW, FOREST_S, FOREST_SE],
-    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
-    []
-]
-
-tile_region_type = {}
-for j,r in enumerate(region_types):
-    for i in r:
-        tile_region_type[i] = j
-for i in ALL_TILES:
-    if i not in tile_region_type:
-        tile_region_type[i] = MISC_REGION
-
-alt_region_types = [
-    [LAND],
-    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
-    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
-    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
-     MOUNTAIN_W, MOUNTAIN_E,
-     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE,
-     EARTH_CAVE, ICE_CAVE, DWARF_CAVE, MATOYAS_CAVE, SARDAS_CAVE, TITAN_CAVE_E, TITAN_CAVE_W],
-    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
-    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
-    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
-     FOREST_W, FOREST_E,
-     FOREST_SW, FOREST_S, FOREST_SE],
-    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
-]
-alt_tile_region_type = {}
-for j,r in enumerate(alt_region_types):
-    for i in r:
-        alt_tile_region_type[i] = j
-for i in ALL_TILES:
-    if i not in alt_tile_region_type:
-        alt_tile_region_type[i] = MISC_REGION
-
-
-def find_regions(tilemap):
+def find_regions(tilemap, tile_region_type):
     regionmap = []
     for x in range(0, map_size):
         regionmap.append([None] * map_size)
@@ -308,10 +251,6 @@ def find_regions(tilemap):
             regionlist[current_region].adjacent.add(next_region)
             regionlist[next_region].adjacent.add(current_region)
 
-
-    #printmap(regionmap)
-    #print(regionlist)
-
     colormap = {}
     for i,_ in enumerate(regionlist):
         colormap[i] = (random.randint(5, 250), random.randint(5, 250), random.randint(5, 250))
@@ -325,7 +264,7 @@ def remove_small_regions(tilemap, regionlist):
         if len(r.points) > 5:
             continue
 
-        repl = [region_types[regionlist[adj].tile][0] for adj in r.adjacent]
+        repl = [pre_shore_region_types[regionlist[adj].tile][0] for adj in r.adjacent]
         random.shuffle(repl)
         for p in r.points:
             tilemap[p[1]][p[0]] = repl[0]
@@ -514,7 +453,7 @@ def add_biomes(tilemap, landregions):
     #             tilemap[y][x] = DESERT
     #             continue
 
-    biomes = [LAND, FOREST, GRASS, MARSH, DESERT]
+    biomes = [FOREST, FOREST, GRASS, MARSH, DESERT]
     for r in landregions:
         for i in range(0, len(r.points)//100 + 1):
             b = random.randint(0, len(biomes)-1)
@@ -565,7 +504,7 @@ def pit_cave_feature(cave):
 
 def place_features(tilemap):
 
-    regionmap, regionlist = find_regions(tilemap)
+    regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
 
     features = [CONERIA_CITY, TEMPLE_OF_FIENDS, PRAVOKA_CITY, ELFLAND_TOWN_CASTLE, ASTOS_CASTLE,
                 ORDEALS_CASTLE, MELMOND_TOWN, ONRAC_TOWN,
@@ -729,24 +668,24 @@ def procgen():
                                                         "*": all_simple_tiles}, False)
 
     print("removing small islands")
-    regionmap, regionlist = find_regions(tilemap)
+    regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
     remove_small_islands(tilemap, regionlist)
 
     print("Adding biomes")
-    regionmap, regionlist = find_regions(tilemap)
+    regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
     landregions = [r for r in regionlist if r.tile == LAND]
     tilemap = add_biomes(tilemap, landregions)
 
     for i in range(0, 3):
         print("removing small regions")
-        regionmap, regionlist = find_regions(tilemap)
+        regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
         remove_small_regions(tilemap, regionlist)
 
         print("Removing salients")
-        tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, tile_region_type))
+        tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, pre_shore_region_map))
 
     print("small seas become lakes")
-    regionmap, regionlist = find_regions(tilemap)
+    regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
     small_seas_become_lakes(tilemap, regionlist)
 
     place_features(tilemap)
@@ -755,10 +694,12 @@ def procgen():
     tilemap = apply_shores(tilemap)
 
     print("Removing salients")
-    tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, alt_tile_region_type))
+    tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, post_shore_region_map))
     tilemap = apply_borders(tilemap)
 
     starting_location = (0,0)
+
+    regionmap, regionlist = find_regions(tilemap, traversable_region_map)
 
     # single tile features
     #

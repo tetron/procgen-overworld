@@ -257,3 +257,84 @@ ALL_TILES = [
     CITY_WALL_GATE_E,
     CITY_WALL_SE2,
 ]
+
+LAND_REGION = 0
+GRASS_REGION = 1
+MARSH_REGION = 2
+MOUNTAIN_REGION = 3
+OCEAN_REGION = 4
+RIVER_REGION = 5
+FOREST_REGION = 6
+DESERT_REGION = 7
+MISC_REGION = 8
+
+pre_shore_region_types = [
+    [LAND, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
+    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
+    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
+    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+     MOUNTAIN_W, MOUNTAIN_E,
+     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE],
+    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S],
+    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
+    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
+     FOREST_W, FOREST_E,
+     FOREST_SW, FOREST_S, FOREST_SE],
+    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
+    []
+]
+
+pre_shore_region_map = {}
+for j,r in enumerate(pre_shore_region_types):
+    for i in r:
+        pre_shore_region_map[i] = j
+for i in ALL_TILES:
+    if i not in pre_shore_region_map:
+        pre_shore_region_map[i] = MISC_REGION
+
+post_shore_region_types = [
+    [LAND],
+    [GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE],
+    [MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE],
+    [MOUNTAIN, MOUNTAIN_NW, MOUNTAIN_N, MOUNTAIN_NE,
+     MOUNTAIN_W, MOUNTAIN_E,
+     MOUNTAIN_SW, MOUNTAIN_S, MOUNTAIN_SE,
+     EARTH_CAVE, ICE_CAVE, DWARF_CAVE, MATOYAS_CAVE, SARDAS_CAVE, TITAN_CAVE_E, TITAN_CAVE_W],
+    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE],
+    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
+    [FOREST, FOREST_NW, FOREST_N, FOREST_NE,
+     FOREST_W, FOREST_E,
+     FOREST_SW, FOREST_S, FOREST_SE],
+    [DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE],
+]
+post_shore_region_map = {}
+for j,r in enumerate(post_shore_region_types):
+    for i in r:
+        post_shore_region_map[i] = j
+for i in ALL_TILES:
+    if i not in post_shore_region_map:
+        post_shore_region_map[i] = MISC_REGION
+
+WALKABLE_REGION = 0
+SAILING_REGION = 1
+CANOE_REGION = 2
+
+traversable_region_types = [
+    [LAND, GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE,
+     MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE,
+     FOREST, FOREST_NW, FOREST_N, FOREST_NE,
+     FOREST_W, FOREST_E,
+     FOREST_SW, FOREST_S, FOREST_SE,
+     SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE,
+     DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE,
+     CITY_PAVED],
+    [OCEAN, SHORE_W, SHORE_N, SHORE_E, SHORE_S],
+    [RIVER, RIVER_NW, RIVER_NE, RIVER_SW, RIVER_SE],
+]
+traversable_region_map = {}
+for j,r in enumerate(traversable_region_types):
+    for i in r:
+        traversable_region_map[i] = j
+for i in ALL_TILES:
+    if i not in traversable_region_map:
+        traversable_region_map[i] = MISC_REGION
