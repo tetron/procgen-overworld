@@ -24,7 +24,7 @@ PRAVOKA_CITY = [
     [None, CITY_WALL_W1, CITY_WALL_W2, PRAVOKA, CITY_WALL_E2, CITY_WALL_E1, None],
     [None, CITY_WALL_W3, PRAVOKA, CITY_PAVED, PRAVOKA, CITY_WALL_E3, None],
     [None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None],
-    [None,          None,             LAND,       LAND,             LAND,          None, None]
+    [None,          None,             DOCK_S,       DOCK_S,             DOCK_S,          None, None]
 ]
 
 ELFLAND_CASTLE = [

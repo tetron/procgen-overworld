@@ -118,6 +118,8 @@ def check_salient(tile_region_type, tilemap, rule, x, y, multi):
             # surrounding it
             if k == OCEAN_REGION:
                 return LAND
+            if k == MISC_REGION:
+                return False
             return pre_shore_region_types[k][0]
 
     if tile in (MOUNTAIN_REGION, FOREST_REGION):
@@ -216,7 +218,7 @@ def find_regions(tilemap, tile_region_type):
     regionmap = []
     for x in range(0, map_size):
         regionmap.append([None] * map_size)
-    regionlist = [Region(OCEAN_REGION, 0)]
+    regionlist = [Region(tile_region_type[OCEAN], 0)]
 
     working_stack = [(0, 0, 0)]
     pending = []
@@ -338,25 +340,30 @@ def render_feature(tilemap, regionmap, weightmap, feature, x, y):
             if dist <= radius:
                 weightmap[y2][x2] += (radius - dist)
 
+def check_fit(regionmap, r, x, y, h, w):
+    fits = True
+    for y2 in range(y, y+h):
+        for x2 in range(x, x+w):
+            if regionmap[y2][x2] != r.regionid:
+                fits = False
+                break
+        if not fits:
+            break
+    return fits
+
+
 def place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, feature, place_at=None):
     h = len(feature)
     w = len(feature[0])
 
     candidates = set()
     if place_at is not None:
-        candidates.add(place_at)
+        if check_fit(regionmap, r, place_at[0], place_at[1], h, w):
+            candidates.add(place_at)
     else:
         for y in range(r.nwcorner[1], r.secorner[1]-h):
             for x in range(r.nwcorner[0], r.secorner[0]-w):
-                fits = True
-                for y2 in range(y, y+h):
-                    for x2 in range(x, x+w):
-                        if regionmap[y2][x2] != r.regionid:
-                            fits = False
-                            break
-                    if not fits:
-                        break
-                if fits:
+                if check_fit(regionmap, r, x, y, h, w):
                     candidates.add((x, y))
 
     candidates = list(candidates)
@@ -429,34 +436,6 @@ def splat(tilemap, x, y, biometype):
 
 
 def add_biomes(tilemap, landregions):
-    # biomemap = []
-    # for x in range(0, map_size):
-    #     biomemap.append([None] * map_size)
-
-    # biomemap[0][0] = 0
-    # biomemap[map_size-1][0] = 0
-    # biomemap[0][map_size-1] = 0
-    # biomemap[map_size-1][map_size-1] = 0
-
-    # perturb_point(biomemap, 0, 0, map_size-1, map_size-1, 1)
-
-    # for y,row in enumerate(biomemap):
-    #     for x,tile in enumerate(row):
-    #         if tilemap[y][x] != LAND:
-    #             continue
-    #         if tile < -.5:
-    #             tilemap[y][x] = MARSH
-    #             continue
-    #         if tile < .25:
-    #             tilemap[y][x] = FOREST
-    #             continue
-    #         if tile < .5:
-    #             tilemap[y][x] = GRASS
-    #             continue
-    #         else:
-    #             tilemap[y][x] = DESERT
-    #             continue
-
     biomes = [FOREST, FOREST, GRASS, MARSH, DESERT]
     for r in landregions:
         for i in range(0, len(r.points)//100 + 1):
@@ -600,58 +579,37 @@ def place_features(tilemap):
         tilemap[bridge_point[1]][bridge_point[0]] = DOCK_W
 
         placed_pravoka = False
-        for p in bridged_region.points:
-            # north shore
+        for p in bridged_region.border_points:
             x = p[0]
             y = p[1]
 
-            c1 = traversable_regionmap[y+1][x]
-            print("region s", traversable_regionlist[c1].tile)
+            w = len(PRAVOKA_CITY[0])
+            h = len(PRAVOKA_CITY)
 
-        #     c1 = traversable_regionmap[y-1][x]
-        #     c2 = traversable_regionmap[y-1][x+1]
-        #     print(traversable_regionlist[c1].tile, traversable_regionlist[c2].tile)
-        #     if (traversable_regionlist[c1].tile == SAILING_REGION and
-        #         traversable_regionlist[c2].tile == SAILING_REGION):
-        #         tilemap[y][x] = DOCK_W
+            for c in ((-1,   h, "W"),
+                      ( w,   h, "E"),
+                      (w//2, h, "S"),
+            ):
+                c1 = traversable_regionmap[y+c[1]][x+c[0]]
+                if (traversable_regionlist[c1].tile == SAILING_REGION):
 
-        #          #placed_pravoka = place_feature_in_region(bridged_region, biome_regionmap, tilemap,
-        #          #                                weightmap, weight, PRAVOKA_CITY, place_at=p)
-        #          #if placed_pravoka is not False:
-        #          #    break
+                    placed_pravoka = place_feature_in_region(bridged_region, traversable_regionmap, tilemap,
+                                                             weightmap, weight, PRAVOKA_CITY, place_at=(p[0], p[1]))
 
-        #     # east shore
-        #     c1 = traversable_regionmap[y][x+1]
-        #     c2 = traversable_regionmap[y+1][x+1]
-        #     print(traversable_regionlist[c1].tile, traversable_regionlist[c2].tile)
-        #     if (traversable_regionlist[c1].tile == SAILING_REGION and
-        #         traversable_regionlist[c2].tile == SAILING_REGION):
-        #         tilemap[y][x] = DOCK_W
+                if placed_pravoka is not False:
+                    print("Placed as", c[2])
+                    # make a canal
+                    break
 
-        #         #placed_pravoka = place_feature_in_region(bridged_region, biome_regionmap, tilemap,
-        #         #                                 weightmap, weight, PRAVOKA_CITY, place_at=p)
-        #         # if placed_pravoka is not False:
-        #         #     break
+            if placed_pravoka is not False:
+                break
 
-        #     # south shore
-        #     c1 = traversable_regionmap[y+1][x]
-        #     c2 = traversable_regionmap[y+1][x+1]
-        #     print(traversable_regionlist[c1].tile, traversable_regionlist[c2].tile)
-        #     if (traversable_regionlist[c1].tile == SAILING_REGION and
-        #         traversable_regionlist[c2].tile == SAILING_REGION):
-        #         tilemap[y][x] = DOCK_W
+        if placed_pravoka is False:
+            print("Couldn't place pravoka")
+            continue
+        else:
+            print("placed pravoka", placed_pravoka)
 
-        #     # west shore
-        #     c1 = traversable_regionmap[y][x-1]
-        #     c2 = traversable_regionmap[y+1][x-1]
-        #     print(traversable_regionlist[c1].tile, traversable_regionlist[c2].tile)
-        #     if (traversable_regionlist[c1].tile == SAILING_REGION and
-        #         traversable_regionlist[c2].tile == SAILING_REGION):
-        #         tilemap[y][x] = DOCK_W
-
-        # if placed_pravoka is False:
-        #     print("Couldn't place pravoka")
-        #     #continue
 
         return tilemap
 
@@ -827,6 +785,8 @@ def procgen():
     small_seas_become_lakes(tilemap, regionlist)
 
     tilemap = place_features(tilemap)
+    if tilemap is None:
+        return False
 
     print("Applying borders")
     tilemap = apply_shores(tilemap)
