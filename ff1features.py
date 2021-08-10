@@ -19,13 +19,25 @@ TEMPLE_OF_FIENDS = [
     [None, None,      LAND,      LAND, None, None],
 ]
 
+# PRAVOKA_CITY = [
+#     [None, None, CITY_WALL_NW, CITY_WALL_N, CITY_WALL_NE, None, None],
+#     [None, CITY_WALL_W1, CITY_WALL_W2, PRAVOKA, CITY_WALL_E2, CITY_WALL_E1, None],
+#     [None, CITY_WALL_W3, PRAVOKA, CITY_PAVED, PRAVOKA, CITY_WALL_E3, None],
+#     [None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None],
+#     [None,          None,             DOCK_S,       DOCK_S,             DOCK_S,          None, None]
+# ]
+
+
 PRAVOKA_CITY = [
+    [None, None, None, None, None, None, None],
     [None, None, CITY_WALL_NW, CITY_WALL_N, CITY_WALL_NE, None, None],
     [None, CITY_WALL_W1, CITY_WALL_W2, PRAVOKA, CITY_WALL_E2, CITY_WALL_E1, None],
     [None, CITY_WALL_W3, PRAVOKA, CITY_PAVED, PRAVOKA, CITY_WALL_E3, None],
     [None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None],
-    [None,          None,             DOCK_S,       DOCK_S,             DOCK_S,          None, None]
+    [None,           None,             DOCK_S,       DOCK_S,             DOCK_S,          None, None],
+    [OCEAN,       OCEAN,              OCEAN,        OCEAN,              OCEAN,           OCEAN, OCEAN]
 ]
+
 
 ELFLAND_CASTLE = [
     [SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W],
@@ -107,4 +119,15 @@ OASIS = [
     [None, DESERT_NW, DESERT_NE],
     [DESERT_NW, CARAVAN_DESERT, DESERT_SE],
     [DESERT_SW, DESERT_SE, None]
+]
+
+NS_DOCK = [
+    [DOCK_W, OCEAN],
+    [DOCK_W, OCEAN],
+    [DOCK_W, OCEAN],
+]
+
+EW_DOCK = [
+    [DOCK_S, DOCK_S, DOCK_S],
+    [OCEAN,   OCEAN,  OCEAN],
 ]

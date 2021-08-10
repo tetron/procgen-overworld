@@ -2,7 +2,7 @@ import random
 import math
 import json
 import functools
-
+import copy
 import PIL.Image
 from ff1features import *
 from ff1filters import *
@@ -393,10 +393,8 @@ def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
                 if tilemap[y-1][x2] != MOUNTAIN:
                     fits = False
                     break
-            for x2 in range(x-1, x+2):
-                if tilemap[y][x2] not in (LAND, MARSH, FOREST, DESERT, GRASS):
-                    fits = False
-                    break
+            if tilemap[y][x] not in (LAND, MARSH, FOREST, DESERT, GRASS):
+                fits = False
             if fits:
                 candidates.add((x, y-1))
 
@@ -505,6 +503,168 @@ def place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weig
             return loc
     return False
 
+class PlacementState():
+    def __init__(self, tilemap, biome_regionmap, biome_regionlist, traversable_regionmap, traversable_regionlist, weightmap):
+        self.tilemap = tilemap
+        self.biome_regionmap = biome_regionmap
+        self.biome_regionlist = biome_regionlist
+        self.traversable_regionmap = traversable_regionmap
+        self.traversable_regionlist = traversable_regionlist
+        self.weightmap = weightmap
+        self.coneria = False
+        self.fiends = False
+        self.bridge = False
+        self.pravoka = False
+        self.reachable = []
+
+    def copy(self):
+        c = copy.copy(self)
+        c.tilemap = copy.deepcopy(c.tilemap)
+        c.weightmap = copy.deepcopy(c.weightmap)
+        return c
+
+    def place_coneria(self, traversable_region):
+        subregions = [self.biome_regionlist[r] for r in get_subregions(traversable_region, self.biome_regionmap)]
+        self.coneria = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, CONERIA_CITY)
+        self.reachable.append(traversable_region.regionid)
+        if self.coneria is not False:
+            print("placed coneria at", self.coneria)
+            return [functools.partial(self.copy().place_fiends, traversable_region, subregions)]
+        return False
+
+    def place_fiends(self, region, subregions):
+        self.fiends = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, TEMPLE_OF_FIENDS)
+        if self.fiends is not False:
+            print("placed ToF at", self.fiends)
+            return [functools.partial(self.place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
+        return False
+
+    def bridge_candidates(self, coneria_region):
+        return [functools.partial(self.copy().place_bridge, coneria_region, self.traversable_regionlist[a])
+                for a in coneria_region.adjacent
+                if self.traversable_regionlist[a].tile == CANOE_REGION]
+
+    def place_bridge(self, coneria_region, r):
+        bridged_region = None
+        pickpoint = list(r.points)
+        random.shuffle(pickpoint)
+        for p in pickpoint:
+            c1 = self.traversable_regionmap[p[1]-1][p[0]]
+            c2 = self.traversable_regionmap[p[1]+1][p[0]]
+            if (c1 == coneria_region.regionid and c2 != coneria_region.regionid and
+                self.traversable_regionlist[c2].tile == WALKABLE_REGION):
+                self.bridge = p
+                bridged_region = self.traversable_regionlist[c2]
+                break
+
+            if (c2 == coneria_region.regionid and c1 != coneria_region.regionid and
+                self.traversable_regionlist[c1].tile == WALKABLE_REGION):
+                self.bridge = p
+                bridged_region = self.traversable_regionlist[c1]
+                break
+
+        if self.bridge is not False:
+            self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
+            print("placed bridge at", self.bridge)
+            self.reachable.append(bridged_region.regionid)
+            return [functools.partial(self.copy().place_pravoka, bridged_region)]
+
+        return False
+
+    def place_pravoka(self, pravoka_region):
+        for p in pravoka_region.points:
+            x = p[0]
+            y = p[1]
+
+            w = len(PRAVOKA_CITY[0])
+            h = len(PRAVOKA_CITY)
+
+            for c in ((-1, h-1, w-1),
+                      (w,  h-1, 0),
+            ):
+                c1 = self.traversable_regionmap[y+c[1]][x+c[0]]
+                if c1 == 0:
+                    self.pravoka = place_feature_in_region(pravoka_region, self.traversable_regionmap, self.tilemap,
+                                                           self.weightmap, 0, PRAVOKA_CITY, place_at=(p[0], p[1]))
+                    if self.pravoka is not False:
+                        self.tilemap[y+c[1]][x+c[2]] = LAND
+                        print("placed pravoka at", self.pravoka)
+                        def dwarf(self, region):
+                            return self.place_dwarf_cave(region)
+                        return [functools.partial(self.copy().dock_accessible_candidates, dwarf)]
+        return False
+
+    def dock_accessible_candidates(self, placement_func):
+        candidate_regions = []
+        total = 0
+        for a in self.traversable_regionlist[0].adjacent:
+            rg = self.traversable_regionlist[a]
+            if rg.tile != WALKABLE_REGION:
+                continue
+            candidate_regions.append(rg)
+            total += len(rg.points)
+
+        attempts = []
+
+        random.shuffle(candidate_regions)
+
+        while candidate_regions:
+            pick = random.randrange(0, total)
+            i = 0
+            pick -= len(candidate_regions[i].points)
+            while pick > 0:
+                i += 1
+                pick -= len(candidate_regions[i].points)
+            total -= len(candidate_regions[i].points)
+            reg = candidate_regions.pop(i)
+            attempts.append(functools.partial(placement_func, self.copy(), reg))
+
+        return attempts
+
+    def place_dock(self, region):
+        for p in region.border_points:
+            for c in ((-1, 0,  0, -1, EW_DOCK),
+                      (0,  1, -1,  0, NS_DOCK),
+                      (1,  0,  0, -1, EW_DOCK),
+                      (0,  1, -1,  0, NS_DOCK),
+            ):
+                if self.tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
+                    dock = place_feature_in_region(region, self.traversable_regionmap, self.tilemap,
+                                                  self.weightmap, 0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
+                    if dock is not False:
+                        print("placed a dock at", dock)
+                        return True
+        return False
+
+    def place_dwarf_cave(self, region):
+        pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, DWARF_CAVE)
+        if pc is False:
+            return False
+        print("Placed dwarf cave")
+
+        if not self.place_dock(region):
+            return False
+
+        def elf(self, region):
+            return self.place_elfland(region)
+        return [functools.partial(self.copy().dock_accessible_candidates, elf)]
+
+    def place_elfland(self, region):
+        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
+                      if self.biome_regionlist[r].tile in (LAND_REGION, GRASS_REGION, FOREST_REGION)]
+        self.elfland = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, ELFLAND_TOWN_CASTLE)
+
+        if self.elfland is False:
+            return False
+
+        if not self.place_dock(region):
+            return False
+
+        print("placed Elfland at", self.elfland)
+        return self
+        #return [functools.partial(self.place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
+
+
 def place_features(tilemap):
 
     biome_regionmap, biome_regionlist = find_regions(tilemap, pre_shore_region_map)
@@ -527,91 +687,110 @@ def place_features(tilemap):
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
 
-    checkp = tilemap
-
-    current_region = None
-    weight = 0
-    placed = False
-
+    pending = []
     for w in walkable_regions:
-        current_region = w
-        tilemap = dup_tilemap(checkp)
-        subregions = [biome_regionlist[r] for r in get_subregions(w, biome_regionmap)]
-        placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, CONERIA_CITY)
-        if placed is False:
-            continue
-        print("placed coneria at",placed)
+        pending.append(functools.partial(PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
+                                                        traversable_regionmap, traversable_regionlist, weightmap).place_coneria, w))
 
-        placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, TEMPLE_OF_FIENDS)
-        if placed is False:
-            continue
-        print("placed ToF at",placed)
+    finalstate = None
+    while pending:
+        p = pending.pop()
+        r = p()
+        if isinstance(r, PlacementState):
+            finalstate = r
+            break
+        if r is not False:
+            pending.extend(r)
 
-        bridge_point = None
-        bridged_region = None
-        for a in current_region.adjacent:
-            r = traversable_regionlist[a]
-            if r.tile != CANOE_REGION:
-                continue
-            pickpoint = list(r.points)
-            random.shuffle(pickpoint)
-            for p in pickpoint:
-                c1 = traversable_regionmap[p[1]-1][p[0]]
-                c2 = traversable_regionmap[p[1]+1][p[0]]
-                if (c1 == current_region.regionid and c2 != current_region.regionid and
-                    traversable_regionlist[c2].tile == WALKABLE_REGION):
-                    bridge_point = p
-                    bridged_region = traversable_regionlist[c2]
-                    break
-                if (c2 == current_region.regionid and c1 != current_region.regionid and
-                    traversable_regionlist[c1].tile == WALKABLE_REGION):
-                    bridge_point = p
-                    bridged_region = traversable_regionlist[c1]
-                    break
-            if bridge_point is not None:
-                break
+    if finalstate is not None:
+        return finalstate.tilemap
 
-        if bridge_point is None:
-            print("Couldn't place bridge")
-            continue
+    # checkp = tilemap
 
-        print("Placed bridge",bridge_point)
-        tilemap[bridge_point[1]][bridge_point[0]] = DOCK_W
+    # current_region = None
+    # weight = 0
+    # placed = False
 
-        placed_pravoka = False
-        for p in bridged_region.border_points:
-            x = p[0]
-            y = p[1]
+    # for w in walkable_regions:
+    #     current_region = w
+    #     tilemap = dup_tilemap(checkp)
 
-            w = len(PRAVOKA_CITY[0])
-            h = len(PRAVOKA_CITY)
+    #     subregions = [biome_regionlist[r] for r in get_subregions(w, biome_regionmap)]
+    #     placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, CONERIA_CITY)
+    #     if placed is False:
+    #         continue
+    #     print("placed coneria at",placed)
 
-            for c in ((-1,   h, "W"),
-                      ( w,   h, "E"),
-                      (w//2, h, "S"),
-            ):
-                c1 = traversable_regionmap[y+c[1]][x+c[0]]
-                if (traversable_regionlist[c1].tile == SAILING_REGION):
+    #     placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, TEMPLE_OF_FIENDS)
+    #     if placed is False:
+    #         continue
+    #     print("placed ToF at",placed)
 
-                    placed_pravoka = place_feature_in_region(bridged_region, traversable_regionmap, tilemap,
-                                                             weightmap, weight, PRAVOKA_CITY, place_at=(p[0], p[1]))
+    #     bridge_point = None
+    #     bridged_region = None
+    #     for a in current_region.adjacent:
+    #         r = traversable_regionlist[a]
+    #         if r.tile != CANOE_REGION:
+    #             continue
+    #         pickpoint = list(r.points)
+    #         random.shuffle(pickpoint)
+    #         for p in pickpoint:
+    #             c1 = traversable_regionmap[p[1]-1][p[0]]
+    #             c2 = traversable_regionmap[p[1]+1][p[0]]
+    #             if (c1 == current_region.regionid and c2 != current_region.regionid and
+    #                 traversable_regionlist[c2].tile == WALKABLE_REGION):
+    #                 bridge_point = p
+    #                 bridged_region = traversable_regionlist[c2]
+    #                 break
+    #             if (c2 == current_region.regionid and c1 != current_region.regionid and
+    #                 traversable_regionlist[c1].tile == WALKABLE_REGION):
+    #                 bridge_point = p
+    #                 bridged_region = traversable_regionlist[c1]
+    #                 break
+    #         if bridge_point is not None:
+    #             break
 
-                if placed_pravoka is not False:
-                    print("Placed as", c[2])
-                    # make a canal
-                    break
+    #     if bridge_point is None:
+    #         print("Couldn't place bridge")
+    #         continue
 
-            if placed_pravoka is not False:
-                break
+    #     print("Placed bridge",bridge_point)
+    #     tilemap[bridge_point[1]][bridge_point[0]] = DOCK_W
 
-        if placed_pravoka is False:
-            print("Couldn't place pravoka")
-            continue
-        else:
-            print("placed pravoka", placed_pravoka)
+    #     placed_pravoka = False
+    #     for p in bridged_region.border_points:
+    #         x = p[0]
+    #         y = p[1]
+
+    #         w = len(PRAVOKA_CITY[0])+1
+    #         h = len(PRAVOKA_CITY)+1
+
+    #         for c in ((-1,   h, "W"),
+    #                   ( w,   h, "E"),
+    #                   (w//2, h, "S"),
+    #         ):
+    #             c1 = traversable_regionmap[y+c[1]][x+c[0]]
+    #             if (traversable_regionlist[c1].tile == SAILING_REGION):
+
+    #                 placed_pravoka = place_feature_in_region(bridged_region, traversable_regionmap, tilemap,
+    #                                                          weightmap, weight, PRAVOKA_CITY, place_at=(p[0], p[1]))
+
+    #             if placed_pravoka is not False:
+    #                 print("Placed as", c[2])
+    #                 # make a canal
+    #                 break
+
+    #         if placed_pravoka is not False:
+    #             break
+
+    #     if placed_pravoka is False:
+    #         print("Couldn't place pravoka")
+    #         continue
+    #     else:
+    #         print("placed pravoka", placed_pravoka)
 
 
-        return tilemap
+    #     return tilemap
 
     return None
 
@@ -784,6 +963,8 @@ def procgen():
     regionmap, regionlist = find_regions(tilemap, pre_shore_region_map)
     small_seas_become_lakes(tilemap, regionlist)
 
+    saveffm(tilemap, "map5.ffm")
+
     tilemap = place_features(tilemap)
     if tilemap is None:
         return False
@@ -841,7 +1022,7 @@ def procgen():
 
     return True
 
-
+random.seed(125)
 success = procgen()
-while success is False:
-    success = procgen()
+#while success is False:
+#success = procgen()
