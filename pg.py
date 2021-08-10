@@ -320,6 +320,17 @@ def flow_river(basemap, tilemap, pending):
         pending.sort(key=lambda ab: basemap[ab[1]][ab[0]], reverse=True)
         #print([(ab[0], ab[1], basemap[ab[1]][ab[0]]) for ab in pending])
 
+def flow_rivers(basemap, tilemap, lower_elev, upper_elev, count):
+    points = []
+    for y,row in enumerate(basemap):
+        for x,tile in enumerate(row):
+            if tile >= lower_elev and tile <= upper_elev:
+                points.append((x,y))
+
+    random.shuffle(points)
+    for p in points[:count]:
+        flow_river(basemap, tilemap, [p])
+
 
 def render_feature(tilemap, regionmap, weightmap, feature, x, y):
     for y2,row in enumerate(feature):
@@ -981,16 +992,8 @@ def procgen():
     print("expanding oceans")
     tilemap = apply_filter(tilemap, expand_oceans, {"_": (LAND, OCEAN, MOUNTAIN)}, False)
 
-    points = []
-    for y,row in enumerate(basemap):
-        for x,tile in enumerate(row):
-            if tile >= (mountain_elevation + ((heightmax-mountain_elevation)*.5)):
-                points.append((x,y))
-
-    print("flowing rivers")
-    random.shuffle(points)
-    for p in points[:16]:
-        flow_river(basemap, tilemap, [p])
+    flow_rivers(basemap, tilemap, mountain_elevation + (heightmax-mountain_elevation)*.5, heightmax, 10)
+    flow_rivers(basemap, tilemap, sea_elevation + (mountain_elevation-sea_elevation)*.5, mountain_elevation, 10)
 
     tilemap = apply_filter(tilemap, connect_diagonals, {"_": (MOUNTAIN, LAND),
                                                         "*": all_simple_tiles}, False)
