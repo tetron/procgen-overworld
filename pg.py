@@ -550,18 +550,22 @@ class PlacementState():
         random.shuffle(pickpoint)
         for p in pickpoint:
             c1 = self.traversable_regionmap[p[1]-1][p[0]]
-            c2 = self.traversable_regionmap[p[1]+1][p[0]]
-            if (c1 == coneria_region.regionid and c2 != coneria_region.regionid and
-                self.traversable_regionlist[c2].tile == WALKABLE_REGION):
-                self.bridge = p
-                bridged_region = self.traversable_regionlist[c2]
-                break
+            for ad in (1,):
+                c2 = self.traversable_regionmap[p[1]+ad][p[0]]
+                if ad == 2:
+                    if self.tilemap[p[1]+1][p[0]] != RIVER:
+                        continue
+                if (c1 == coneria_region.regionid and c2 != coneria_region.regionid and
+                    self.traversable_regionlist[c2].tile == WALKABLE_REGION):
+                    self.bridge = p
+                    bridged_region = self.traversable_regionlist[c2]
+                    break
 
-            if (c2 == coneria_region.regionid and c1 != coneria_region.regionid and
-                self.traversable_regionlist[c1].tile == WALKABLE_REGION):
-                self.bridge = p
-                bridged_region = self.traversable_regionlist[c1]
-                break
+                if (c2 == coneria_region.regionid and c1 != coneria_region.regionid and
+                    self.traversable_regionlist[c1].tile == WALKABLE_REGION):
+                    self.bridge = p
+                    bridged_region = self.traversable_regionlist[c1]
+                    break
 
         if self.bridge is not False:
             self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
@@ -645,6 +649,20 @@ class PlacementState():
         if not self.place_dock(region):
             return False
 
+        def matoya(self, region):
+            return self.place_matoyas_cave(region)
+        return [functools.partial(self.copy().dock_accessible_candidates, matoya)]
+
+
+    def place_matoyas_cave(self, region):
+        pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, MATOYAS_CAVE)
+        if pc is False:
+            return False
+        print("Placed matoyas cave")
+
+        if not self.place_dock(region):
+            return False
+
         def elf(self, region):
             return self.place_elfland(region)
         return [functools.partial(self.copy().dock_accessible_candidates, elf)]
@@ -661,8 +679,43 @@ class PlacementState():
             return False
 
         print("placed Elfland at", self.elfland)
+
+        def melmond(self, region):
+            return self.place_melmond(region)
+        return [functools.partial(self.copy().dock_accessible_candidates, melmond)]
+
+
+    def place_melmond(self, region):
+        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
+                      if self.biome_regionlist[r].tile in (LAND_REGION, DESERT_REGION, MARSH_REGION)]
+        self.melmond = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MELMOND_TOWN)
+
+        if self.melmond is False:
+            return False
+
+        if not self.place_dock(region):
+            return False
+
+        print("placed Melmond at", self.melmond)
+
+        def crescent_lake(self, region):
+            return self.place_crescent_lake(region)
+        return [functools.partial(self.copy().dock_accessible_candidates, crescent_lake)]
+
+
+    def place_crescent_lake(self, region):
+        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
+                      if self.biome_regionlist[r].tile in (LAND_REGION, GRASS_REGION, FOREST_REGION)]
+        self.crescent_lake = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, CRESCENT_LAKE_CITY)
+
+        if self.crescent_lake is False:
+            return False
+
+        if not self.place_dock(region):
+            return False
+
+        print("placed Crescent lake at", self.crescent_lake)
         return self
-        #return [functools.partial(self.place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
 
 
 def place_features(tilemap):
