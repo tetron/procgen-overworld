@@ -74,8 +74,10 @@ MELMOND_TOWN = [
 ]
 
 ONRAC_TOWN = [
-    [ONRAC, ONRAC],
-    [ONRAC, ONRAC]
+    [None, None, None],
+    [None, ONRAC, ONRAC],
+    [None, ONRAC, ONRAC],
+    [None, None, None],
 ]
 
 LEIFEN_CITY = [
@@ -109,10 +111,12 @@ MIRAGE_TOWER = [
     ]
 
 VOLCANO = [
-    [None, None, None, None],
-    [None, VOLCANO_TOP_W, VOLCANO_TOP_E, None],
-    [None, VOLCANO_BASE_W, VOLCANO_BASE_E, None],
-    [None, None, None, None],
+    [None,  RIVER, RIVER,                   RIVER, RIVER, None],
+    [RIVER, RIVER, LAND,                     LAND, RIVER, RIVER],
+    [RIVER, LAND,  VOLCANO_TOP_W,   VOLCANO_TOP_E, LAND,  RIVER],
+    [RIVER, LAND,  VOLCANO_BASE_W, VOLCANO_BASE_E, LAND,  RIVER],
+    [RIVER, RIVER, LAND,                     LAND, RIVER, RIVER],
+    [None,  RIVER, RIVER,                   RIVER, RIVER, None],
 ]
 
 OASIS = [

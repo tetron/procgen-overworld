@@ -468,7 +468,7 @@ def apply_shores(tilemap):
 def apply_borders(tilemap):
     all_tiles = set(ALL_TILES)
 
-    non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE])
+    non_desert_tiles = all_tiles.difference([DESERT, DESERT_NW, DESERT_NE, DESERT_SW, DESERT_SE, MIRAGE_TOP, MIRAGE_BOTTOM, MIRAGE_SHADOW])
     non_marsh_tiles = all_tiles.difference([MARSH, MARSH_NW, MARSH_NE, MARSH_SW, MARSH_SE])
     non_grass_tiles = all_tiles.difference([GRASS, GRASS_NW, GRASS_NE, GRASS_SW, GRASS_SE])
     non_forest_tiles = all_tiles.difference([FOREST_NW, FOREST_N, FOREST_NE, FOREST_W, FOREST,
@@ -520,7 +520,7 @@ ship_accessible_features = [
     ("Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION)),
     ("Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,)),
     ("Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
-    ("Melmond", MELMOND_TOWN, (LAND_REGION, DESERT_REGION, MARSH_REGION)),
+    ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION)),
     ("Earth cave", EARTH_CAVE, "cave"),
     ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
 ]
@@ -601,7 +601,9 @@ class PlacementState():
         return False
 
     def place_pravoka(self, pravoka_region):
-        for p in pravoka_region.points:
+        points = list(pravoka_region.points)
+        random.shuffle(points)
+        for p in points:
             x = p[0]
             y = p[1]
 
@@ -652,9 +654,9 @@ class PlacementState():
     def place_dock(self, region):
         for p in region.border_points:
             for c in ((-1, 0,  0, -1, EW_DOCK),
-                      (0,  1, -1,  0, NS_DOCK),
-                      (1,  0,  0, -1, EW_DOCK),
-                      (0,  1, -1,  0, NS_DOCK),
+                      (0,  1, -1, -2, NS_DOCK),
+                      (1,  0, -2, -1, EW_DOCK),
+                      (0, -1, -1, -2, NS_DOCK),
             ):
                 if self.tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
                     dock = place_feature_in_region(region, self.traversable_regionmap, self.tilemap,
@@ -712,7 +714,7 @@ class PlacementState():
                 continue
             if rg in self.reachable:
                 continue
-            attempts.append(functools.partial(self.place_titan_west, region))
+            attempts.append(functools.partial(self.copy().place_titan_west, region))
         return attempts
 
     def place_titan_west(self, region):
@@ -731,7 +733,54 @@ class PlacementState():
 
         print("Placed Sarda", pc)
 
-        return self
+        return self.place_mirage()
+
+    def place_volcano(self):
+        for region in enumerate(self.biome_regionlist):
+            if region.tile != MOUNTAIN_REGION:
+                pass
+
+    def place_mirage(self):
+        regions = []
+        for region in self.biome_regionlist:
+            if region.tile == DESERT_REGION:
+                regions.append(region)
+
+        pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MIRAGE_TOWER)
+
+        if pc is False:
+            return False
+
+        print("Placed Mirage", pc)
+
+        return self.onrac_candidates()
+
+    def onrac_candidates(self):
+        regions = []
+        for region in self.biome_regionlist:
+            if region.tile in (LAND_REGION, FOREST_REGION, GRASS_REGION, MARSH_REGION):
+                regions.append(region)
+
+        return [functools.partial(self.place_onrac, r) for r in regions]
+
+    def place_onrac(self, region):
+        points = list(region.points)
+        random.shuffle(points)
+        w = len(ONRAC_TOWN[0])
+        for p in points:
+            x = p[0]
+            y = p[1]
+
+            if self.tilemap[y+2][x+w] != OCEAN:
+                continue
+
+            pc = place_feature_in_region(region, self.traversable_regionmap, self.tilemap,
+                                         self.weightmap, 0, ONRAC_TOWN, place_at=(x, y))
+            if pc is not False:
+                print("Placed Onrac at", pc)
+                return self
+
+        return False
 
 def place_features(tilemap):
 
