@@ -420,7 +420,7 @@ def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
         return False
 
     render_feature(tilemap, regionmap, weightmap, [[cave]], candidates[0][0], candidates[0][1])
-    return True
+    return (candidates[0][0], candidates[0][1])
 
 
 def splat(tilemap, x, y, biometype):
@@ -521,7 +521,8 @@ ship_accessible_features = [
     ("Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,)),
     ("Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
     ("Melmond", MELMOND_TOWN, (LAND_REGION, DESERT_REGION, MARSH_REGION)),
-    ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION)),
+    ("Earth cave", EARTH_CAVE, "cave"),
+    ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
 ]
 
 class PlacementState():
@@ -542,6 +543,7 @@ class PlacementState():
     def copy(self):
         c = copy.copy(self)
         c.tilemap = copy.deepcopy(c.tilemap)
+        c.reachable = copy.deepcopy(c.reachable)
         c.weightmap = copy.deepcopy(c.weightmap)
         c.ship_accessible_features = copy.copy(c.ship_accessible_features)
         return c
@@ -686,106 +688,50 @@ class PlacementState():
             popped_feature = self.ship_accessible_features.pop(0)
             return self.dock_accessible_candidates(popped_feature)
         else:
-            return self
+            return [self.place_titan_east]
 
+    def place_titan_east(self):
+        start_region = None
+        reachable = list(self.reachable)
+        random.shuffle(reachable)
+        for rg in reachable:
+            start_region = rg
+            pc = place_cave(self.traversable_regionlist[rg], self.traversable_regionmap,
+                            self.tilemap, self.weightmap, 0, TITAN_CAVE_E)
+            if pc is not False:
+                break
 
-    def place_matoyas_cave(self, region):
-        pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, MATOYAS_CAVE)
         if pc is False:
             return False
-        print("Placed matoyas cave")
 
-        if not self.place_dock(region):
+        print("Placed Titan east", pc)
+
+        attempts = []
+        for rg,region in enumerate(self.traversable_regionlist):
+            if region.tile != WALKABLE_REGION:
+                continue
+            if rg in self.reachable:
+                continue
+            attempts.append(functools.partial(self.place_titan_west, region))
+        return attempts
+
+    def place_titan_west(self, region):
+        pc = place_cave(region, self.traversable_regionmap,
+                        self.tilemap, self.weightmap, 0, TITAN_CAVE_W)
+        if pc is False:
             return False
 
-        def elf(self, region):
-            return self.place_elfland(region)
-        return self.dock_accessible_candidates(elf)
+        print("Placed Titan west", pc)
 
-    def place_elfland(self, region):
-        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                      if self.biome_regionlist[r].tile in (LAND_REGION, GRASS_REGION, FOREST_REGION)]
-        self.elfland = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, ELFLAND_TOWN_CASTLE)
+        pc = place_cave(region, self.traversable_regionmap,
+                        self.tilemap, self.weightmap, 5, SARDAS_CAVE)
 
-        if self.elfland is False:
+        if pc is False:
             return False
 
-        if not self.place_dock(region):
-            return False
+        print("Placed Sarda", pc)
 
-        print("placed Elfland at", self.elfland)
-
-        def melmond(self, region):
-            return self.place_melmond(region)
-        return self.dock_accessible_candidates(melmond)
-
-
-    def place_melmond(self, region):
-        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                      if self.biome_regionlist[r].tile in (LAND_REGION, DESERT_REGION, MARSH_REGION)]
-        self.melmond = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MELMOND_TOWN)
-
-        if self.melmond is False:
-            return False
-
-        if not self.place_dock(region):
-            return False
-
-        print("placed Melmond at", self.melmond)
-
-        def crescent_lake(self, region):
-            return self.place_crescent_lake(region)
-        return self.dock_accessible_candidates(crescent_lake)
-
-
-    def place_crescent_lake(self, region):
-        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                      if self.biome_regionlist[r].tile in (LAND_REGION, GRASS_REGION, FOREST_REGION)]
-        self.crescent_lake = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, CRESCENT_LAKE_CITY)
-
-        if self.crescent_lake is False:
-            return False
-
-        if not self.place_dock(region):
-            return False
-
-        print("placed Crescent lake at", self.crescent_lake)
-
-        def marsh_cave(self, region):
-            return self.place_marsh_cave(region)
-        return self.dock_accessible_candidates(marsh_cave)
-
-    def place_marsh_cave(self, region):
-        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                      if self.biome_regionlist[r].tile == MARSH_REGION]
-        self.marsh_cave = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, pit_cave_feature(MARSH_CAVE))
-
-        if self.marsh_cave is False:
-            return False
-
-        if not self.place_dock(region):
-            return False
-
-        print("placed Marsh cave at", self.marsh_cave)
-
-        def astos_castle(self, region):
-            return self.place_astos_castle(region)
-        return self.dock_accessible_candidates(astos_castle)
-
-    def place_astos_castle(self, region):
-        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                      if self.biome_regionlist[r].tile in (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)]
-        self.astos_castle = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, ASTOS_CASTLE)
-
-        if self.astos_castle is False:
-            return False
-
-        if not self.place_dock(region):
-            return False
-
-        print("placed Astos castle at", self.astos_castle)
         return self
-
 
 def place_features(tilemap):
 
