@@ -186,7 +186,6 @@ class Region:
         self.regionid = regionid
         self.points = set()
         self.adjacent = set()
-        self.border_points = set()
         self.nwcorner = None
         self.secorner = None
 
@@ -242,7 +241,6 @@ def find_regions(tilemap, tile_region_type):
                         working_stack.append((ab[0], ab[1], current_region))
                     else:
                         pending.append((ab[0], ab[1], current_region))
-                        regionlist[current_region].border_points.add((x, y))
 
         while pending and not working_stack:
             x, y, current_region = pending.pop(0)
@@ -505,7 +503,9 @@ def dup_tilemap(tilemap):
 def get_subregions(region, other_regionmap):
     subregions = set()
     for p in region.points:
-        subregions.add(other_regionmap[p[1]][p[0]])
+        oth = other_regionmap[p[1]][p[0]]
+        if oth != -1:
+            subregions.add(oth)
     return subregions
 
 def place_in_random_region(self, subregions, biome_regionmap, weight, feature):
@@ -577,7 +577,7 @@ def onrac_candidates(self):
         if region.tile == WALKABLE_REGION:
             regions.append(region)
     random.shuffle(regions)
-    return [functools.partial(self.place_onrac, r) for r in regions]
+    return [functools.partial(self.copy().place_onrac, r) for r in regions]
 
 
 def place_anywhere(self, name, feature, nonreachable):
@@ -727,17 +727,19 @@ class PlacementState():
 
 
     def place_dock(self, region):
-        for p in region.border_points:
-            for c in ((-1, 0,  0, -1, EW_DOCK),
-                      (0,  1, -1, -2, NS_DOCK),
-                      (1,  0, -2, -1, EW_DOCK),
-                      (0, -1, -1, -2, NS_DOCK),
+        points = list(region.points)
+        random.shuffle(points)
+        for p in points:
+            for c in ((-1, 0,  0, -1, EW_DOCK_STRUCTURE),
+                      (0,  1, -1, 0, EW_DOCK_STRUCTURE),
+                      (1,  0, -2, -1, EW_DOCK_STRUCTURE),
+                      (0, -1, -1, -2, N_DOCK_STRUCTURE),
             ):
                 if self.tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
                     dock = place_feature_in_region(self, region, self.traversable_regionmap,
                                                    0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
                     if dock is not False:
-                        print("placed a dock at", dock)
+                        print("placed a dock at", dock, "in region", region.regionid)
                         return True
         return False
 
@@ -751,6 +753,9 @@ class PlacementState():
         else:
             subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
                           if self.biome_regionlist[r].tile in biome]
+            #print("reg:", region.nwcorner, region.secorner)
+            #for sr in subregions:
+            #    print("sub:", sr.nwcorner, sr.secorner)
             pc = place_in_random_region(self, subregions, self.biome_regionmap, 0, tiles)
 
         if pc is False:
@@ -761,7 +766,7 @@ class PlacementState():
 
         self.reachable.append(region.regionid)
 
-        print("Placed", name, "at", pc)
+        print("Placed", name, "at", pc, "region", region.regionid)
 
         return self.next_feature_todo()
 
@@ -820,17 +825,6 @@ def place_features(tilemap):
     biome_regionmap, biome_regionlist = find_regions(tilemap, pre_shore_region_map)
     traversable_regionmap, traversable_regionlist = find_regions(tilemap, traversable_region_map)
 
-    # features = [CONERIA_CITY, TEMPLE_OF_FIENDS, PRAVOKA_CITY, ELFLAND_TOWN_CASTLE, ASTOS_CASTLE,
-    #             ORDEALS_CASTLE, MELMOND_TOWN, ONRAC_TOWN,
-    #             LEIFEN_CITY, CRESCENT_LAKE_CITY, GAIA_TOWN,
-    #             MIRAGE_TOWER, VOLCANO, OASIS,
-    #             pit_cave_feature(MARSH_CAVE), pit_cave_feature(BAHAMUTS_CAVE),
-    #             pit_cave_feature(CARDIA_1), pit_cave_feature(CARDIA_2),
-    #             pit_cave_feature(CARDIA_3), pit_cave_feature(CARDIA_4),
-    #             pit_cave_feature(CARDIA_5)
-    # ]
-
-
     weightmap = []
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
@@ -852,140 +846,7 @@ def place_features(tilemap):
     if finalstate is not None:
         return finalstate.tilemap
 
-    # checkp = tilemap
-
-    # current_region = None
-    # weight = 0
-    # placed = False
-
-    # for w in walkable_regions:
-    #     current_region = w
-    #     tilemap = dup_tilemap(checkp)
-
-    #     subregions = [biome_regionlist[r] for r in get_subregions(w, biome_regionmap)]
-    #     placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, CONERIA_CITY)
-    #     if placed is False:
-    #         continue
-    #     print("placed coneria at",placed)
-
-    #     placed = place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, TEMPLE_OF_FIENDS)
-    #     if placed is False:
-    #         continue
-    #     print("placed ToF at",placed)
-
-    #     bridge_point = None
-    #     bridged_region = None
-    #     for a in current_region.adjacent:
-    #         r = traversable_regionlist[a]
-    #         if r.tile != CANOE_REGION:
-    #             continue
-    #         pickpoint = list(r.points)
-    #         random.shuffle(pickpoint)
-    #         for p in pickpoint:
-    #             c1 = traversable_regionmap[p[1]-1][p[0]]
-    #             c2 = traversable_regionmap[p[1]+1][p[0]]
-    #             if (c1 == current_region.regionid and c2 != current_region.regionid and
-    #                 traversable_regionlist[c2].tile == WALKABLE_REGION):
-    #                 bridge_point = p
-    #                 bridged_region = traversable_regionlist[c2]
-    #                 break
-    #             if (c2 == current_region.regionid and c1 != current_region.regionid and
-    #                 traversable_regionlist[c1].tile == WALKABLE_REGION):
-    #                 bridge_point = p
-    #                 bridged_region = traversable_regionlist[c1]
-    #                 break
-    #         if bridge_point is not None:
-    #             break
-
-    #     if bridge_point is None:
-    #         print("Couldn't place bridge")
-    #         continue
-
-    #     print("Placed bridge",bridge_point)
-    #     tilemap[bridge_point[1]][bridge_point[0]] = DOCK_W
-
-    #     placed_pravoka = False
-    #     for p in bridged_region.border_points:
-    #         x = p[0]
-    #         y = p[1]
-
-    #         w = len(PRAVOKA_CITY[0])+1
-    #         h = len(PRAVOKA_CITY)+1
-
-    #         for c in ((-1,   h, "W"),
-    #                   ( w,   h, "E"),
-    #                   (w//2, h, "S"),
-    #         ):
-    #             c1 = traversable_regionmap[y+c[1]][x+c[0]]
-    #             if (traversable_regionlist[c1].tile == SAILING_REGION):
-
-    #                 placed_pravoka = place_feature_in_region(bridged_region, traversable_regionmap, tilemap,
-    #                                                          weightmap, weight, PRAVOKA_CITY, place_at=(p[0], p[1]))
-
-    #             if placed_pravoka is not False:
-    #                 print("Placed as", c[2])
-    #                 # make a canal
-    #                 break
-
-    #         if placed_pravoka is not False:
-    #             break
-
-    #     if placed_pravoka is False:
-    #         print("Couldn't place pravoka")
-    #         continue
-    #     else:
-    #         print("placed pravoka", placed_pravoka)
-
-
-    #     return tilemap
-
     return None
-
-    # landregions.sort(key=lambda r: len(r.points), reverse=True)
-    # total = 0
-    # for r in landregions:
-    #     total += len(r.points)
-
-    # starting_location = None
-
-    # print("Placing features")
-    # weightmap = []
-    # for x in range(0, map_size):
-    #     weightmap.append([0] * map_size)
-    # ids = list(range(0, len(regionlist)))
-    # random.shuffle(ids)
-    # i = 0
-    # for f in features:
-    #     found = False
-    #     maxweight = 0
-    #     while not found:
-    #         val = random.randint(0, total)
-    #         for r in landregions:
-    #             val -= len(r.points)
-    #             if val <= 0:
-    #                 break
-    #         loc = place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, f)
-    #         if loc:
-    #             found = True
-    #             if f is CONERIA_CITY:
-    #                 starting_location = (loc[0]+3, loc[1]+7)
-    #         maxweight += 1
-
-    # caves = [MATOYAS_CAVE, DWARF_CAVE, EARTH_CAVE, TITAN_CAVE_E, TITAN_CAVE_W, SARDAS_CAVE, ICE_CAVE]
-
-    # print("Placing caves")
-    # for c in caves:
-    #     found = False
-    #     maxweight = 0
-    #     while not found:
-    #         val = random.randint(0, total)
-    #         for r in landregions:
-    #             val -= len(r.points)
-    #             if val <= 0:
-    #                 break
-    #         if place_cave(r, regionmap, tilemap, weightmap, maxweight, c):
-    #             found = True
-    #         maxweight += 1
 
 
 def procgen():
