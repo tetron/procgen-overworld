@@ -45,13 +45,15 @@ ELFLAND_CASTLE = [
 ]
 
 ASTOS_CASTLE = [
-    [SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W],
-    [ASTOS_CASTLE_W, ASTOS_CASTLE_E],
+    [None, SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W, None],
+    [None, ASTOS_CASTLE_W, ASTOS_CASTLE_E, None],
+    [None, None, None, None],
 ]
 
 ORDEALS_CASTLE = [
-    [SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W],
-    [ORDEALS_CASTLE_W, ORDEALS_CASTLE_E],
+    [None, SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W, None],
+    [None, ORDEALS_CASTLE_W, ORDEALS_CASTLE_E, None],
+    [None, None, None, None],
 ]
 
 ELFLAND_TOWN = [
@@ -69,8 +71,9 @@ ELFLAND_TOWN_CASTLE = [
 
 
 MELMOND_TOWN = [
-    [MELMOND, None],
-    [MELMOND, MELMOND]
+    [None, MELMOND, None,    None],
+    [None, MELMOND, MELMOND, None],
+    [None, None, None,    None],
 ]
 
 ONRAC_TOWN = [
@@ -101,6 +104,7 @@ CRESCENT_LAKE_CITY = [
 GAIA_TOWN = [
     [None, GAIA, GAIA],
     [GAIA, GAIA, None],
+    [None, None, None],
 ]
 
 MIRAGE_TOWER = [
@@ -126,9 +130,9 @@ OASIS = [
 ]
 
 NS_DOCK = [
-    [DOCK_E, OCEAN],
-    [DOCK_E, OCEAN],
-    [DOCK_E, OCEAN],
+    [DOCK_E, OCEAN, DOCK_W],
+    [DOCK_E, OCEAN, DOCK_W],
+    [DOCK_E, OCEAN, DOCK_W],
 ]
 
 EW_DOCK = [

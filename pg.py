@@ -511,13 +511,15 @@ def place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weig
     for sr in subregions:
         loc = place_feature_in_region(sr, biome_regionmap, tilemap, weightmap, weight, feature)
         if loc is not False:
-            return loc
+            return (loc, sr.regionid)
     return False
 
 def place_dock_accessible_feature(self, feature):
     candidate_regions = []
     total = 0
     for a in self.traversable_regionlist[0].adjacent:
+        if a in self.dock_exclude:
+            continue
         rg = self.traversable_regionlist[a]
         if rg.tile != WALKABLE_REGION:
             continue
@@ -541,27 +543,13 @@ def place_dock_accessible_feature(self, feature):
 
     return attempts
 
-def place_titan_east(self):
-    start_region = None
-    reachable = list(self.reachable)
-    random.shuffle(reachable)
-    for rg in reachable:
-        start_region = rg
-        pc = place_cave(self.traversable_regionlist[rg], self.traversable_regionmap,
-                        self.tilemap, self.weightmap, 0, TITAN_CAVE_E)
-        if pc is not False:
-            break
 
-    if pc is False:
-        return False
-
-    print("Placed Titan east", pc)
-
+def titan_west_candidates(self):
     attempts = []
     for rg,region in enumerate(self.traversable_regionlist):
         if region.tile != WALKABLE_REGION:
             continue
-        if rg in self.reachable:
+        if rg in self.reachable or rg in self.dock_exclude:
             continue
         attempts.append(functools.partial(self.copy().place_titan_west, region))
     return attempts
@@ -583,16 +571,55 @@ def place_mirage(self):
 
 def onrac_candidates(self):
     regions = []
+    for region in self.traversable_regionlist:
+        if region.tile == WALKABLE_REGION:
+            regions.append(region)
+    random.shuffle(regions)
+    return [functools.partial(self.place_onrac, r) for r in regions]
+
+
+def place_anywhere(self, name, feature, nonreachable):
+    regions = []
+    for rg in self.traversable_regionlist:
+        if rg.tile != WALKABLE_REGION:
+            continue
+        if nonreachable and rg.regionid in self.reachable:
+            continue
+        regions.append(rg)
+
+    pc = place_in_random_region(regions, self.traversable_regionmap, self.tilemap, self.weightmap, 0, feature)
+
+    if pc is False:
+        return False
+
+    if nonreachable:
+        self.dock_exclude.append(pc[1])
+
+    print("Placed", name, pc)
+
+    return self.next_feature_todo()
+
+def place_leifen(self):
+    regions = []
     for region in self.biome_regionlist:
         if region.tile in (LAND_REGION, FOREST_REGION, GRASS_REGION, MARSH_REGION):
             regions.append(region)
 
-    return [functools.partial(self.place_onrac, r) for r in regions]
+    pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, LEIFEN_TOWN)
+
+    if pc is False:
+        return False
+
+    print("Placed Leifen", pc)
+
+    return self.next_feature_todo()
 
 features_todo = [
-    (place_titan_east,),
+    (place_anywhere, "Gaia", GAIA_TOWN, True),
+    (titan_west_candidates,),
     (place_mirage,),
     (onrac_candidates,),
+    (place_dock_accessible_feature, ("Titan's cave east", TITAN_CAVE_E, "cave")),
     (place_dock_accessible_feature, ("Matoyas cave", MATOYAS_CAVE, "cave")),
     (place_dock_accessible_feature, ("Dwarf cave", DWARF_CAVE, "cave")),
     (place_dock_accessible_feature, ("Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION))),
@@ -601,6 +628,7 @@ features_todo = [
     (place_dock_accessible_feature, ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION))),
     (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
     (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
+    (place_anywhere, "Leifen", LEIFEN_CITY, False),
 ]
 
 class PlacementState():
@@ -617,14 +645,14 @@ class PlacementState():
         self.bridge = False
         self.pravoka = False
         self.reachable = []
-        self.exclude = []
+        self.dock_exclude = []
         self.features_todo = features_todo
 
     def copy(self):
         c = copy.copy(self)
         c.tilemap = copy.deepcopy(c.tilemap)
-        c.reachable = copy.deepcopy(c.reachable)
-        c.exclude = copy.deepcopy(c.exclude)
+        c.reachable = copy.copy(c.reachable)
+        c.dock_exclude = copy.copy(c.dock_exclude)
         c.weightmap = copy.deepcopy(c.weightmap)
         c.features_todo = copy.copy(c.features_todo)
         return c
@@ -647,7 +675,7 @@ class PlacementState():
         self.fiends = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, TEMPLE_OF_FIENDS)
         if self.fiends is not False:
             print("placed ToF at", self.fiends)
-            return [functools.partial(self.place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
+            return [functools.partial(self.copy().place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
         return False
 
     def bridge_candidates(self, coneria_region):
@@ -735,7 +763,6 @@ class PlacementState():
         else:
             subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
                           if self.biome_regionlist[r].tile in biome]
-            # TODO throw out "excluded" regions
             pc = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, tiles)
 
         if pc is False:
@@ -743,6 +770,8 @@ class PlacementState():
 
         if not self.place_dock(region):
             return False
+
+        self.reachable.append(region.regionid)
 
         print("Placed", name, "at", pc)
 
@@ -764,7 +793,7 @@ class PlacementState():
 
         print("Placed Sarda", pc)
 
-        self.exclude.append(region.regionid)
+        self.dock_exclude.append(region.regionid)
 
         return self.next_feature_todo()
 
@@ -1144,7 +1173,7 @@ def procgen():
 
     return True
 
-#random.seed(125)
+random.seed(125)
 success = procgen()
 #while success is False:
 #success = procgen()
