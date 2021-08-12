@@ -490,7 +490,7 @@ def apply_borders(tilemap):
 
 def airship_accessible(region, tilemap):
     for p in region.points:
-        if tile[p[1]][p[0]] in (LAND, GRASS):
+        if tilemap[p[1]][p[0]] in (LAND, GRASS):
             return True
     return False
 
@@ -652,6 +652,37 @@ def place_ordeals(self):
 
     return self.next_feature_todo()
 
+def place_waterfall(self):
+    regions = []
+    for rg in self.traversable_regionlist:
+        if rg.tile != CANOE_REGION:
+            continue
+        accessible = False
+        if 0 in rg.adjacent:
+            accessible = True
+        else:
+            for adj in rg.adjacent:
+                if (self.traversable_regionlist[adj].tile == WALKABLE_REGION and
+                    airship_accessible(self.traversable_regionlist[adj], self.tilemap)):
+                    accessible = True
+        if not accessible:
+            continue
+        regions.append(rg)
+
+    random.shuffle(regions)
+
+    for rg in regions:
+        for p in rg.points:
+            if (self.tilemap[p[1]][p[0]-1] == MOUNTAIN
+                and self.tilemap[p[1]][p[0]+1] == MOUNTAIN
+                and self.tilemap[p[1]-1][p[0]] == RIVER
+                and self.tilemap[p[1]+1][p[0]] == RIVER):
+                pc = place_feature_in_region(self, rg, self.traversable_regionmap,
+                                             0, [[WATERFALL]], place_at=(p[0], p[1]))
+                print("Placed waterfall",pc)
+                return self.next_feature_todo()
+    return False
+
 
 features_todo = [
     (place_gaia,),
@@ -669,6 +700,7 @@ features_todo = [
     (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
     (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
     (place_leifen,),
+    (place_waterfall,),
 ]
 
 class PlacementState():
@@ -1074,7 +1106,7 @@ def procgen():
 
     return True
 
-random.seed(125)
+#random.seed(125)
 success = procgen()
 #while success is False:
 #success = procgen()
