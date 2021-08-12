@@ -102,8 +102,8 @@ CRESCENT_LAKE_CITY = [
     ]
 
 GAIA_TOWN = [
-    [None, GAIA, GAIA],
-    [GAIA, GAIA, None],
+    [GRASS, GAIA, GAIA],
+    [GAIA, GAIA, GRASS],
     [None, None, None],
 ]
 

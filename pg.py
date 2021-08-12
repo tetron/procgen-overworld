@@ -332,12 +332,11 @@ def flow_rivers(basemap, tilemap, lower_elev, upper_elev, count):
         flow_river(basemap, tilemap, [p])
 
 
-def render_feature(tilemap, regionmap, weightmap, feature, x, y):
+def render_feature(tilemap, weightmap, feature, x, y):
     for y2,row in enumerate(feature):
         for x2,tile in enumerate(row):
             if feature[y2][x2] is not None:
                 tilemap[y+y2][x+x2] = feature[y2][x2]
-                regionmap[y+y2][x+x2] = -1
 
     y += len(feature)//2
     x += len(feature[0])//2
@@ -362,35 +361,38 @@ def check_fit(regionmap, r, x, y, h, w):
             break
     return fits
 
-
-def place_feature_in_region(r, regionmap, tilemap, weightmap, maxweight, feature, place_at=None):
+def place_feature_in_region(self, r, regionmap, maxweight, feature, place_at=None):
     h = len(feature)
     w = len(feature[0])
 
-    candidates = set()
+    candidate = None
     if place_at is not None:
         if check_fit(regionmap, r, place_at[0], place_at[1], h, w):
-            candidates.add(place_at)
+            candidate = place_at
     else:
-        for y in range(r.nwcorner[1], r.secorner[1]-h):
-            for x in range(r.nwcorner[0], r.secorner[0]-w):
-                if check_fit(regionmap, r, x, y, h, w):
-                    candidates.add((x, y))
+        #for y in range(r.nwcorner[1], r.secorner[1]-h):
+        #    for x in range(r.nwcorner[0], r.secorner[0]-w):
+        points = list(r.points)
+        random.shuffle(points)
+        for p in points:
+            if check_fit(regionmap, r, p[0], p[1], h, w):
+                if self.weightmap[p[1]+(h//2)][p[0]+(w//2)] > maxweight:
+                    continue
+                candidate = p
 
-    candidates = list(candidates)
-
-    if not candidates:
+    if not candidate:
         return False
 
-    random.shuffle(candidates)
+    render_feature(self.tilemap, self.weightmap, feature, candidate[0], candidate[1])
+    fix_regionmap(self.traversable_regionmap, feature, candidate[0], candidate[1], -1)
+    fix_regionmap(self.biome_regionmap, feature, candidate[0], candidate[1], -1)
+    return candidate
 
-    candidates.sort(key=lambda n: weightmap[n[1]+(h//2)][n[0]+(w//2)])
-    if weightmap[candidates[0][1]+(h//2)][candidates[0][0]+(w//2)] > maxweight:
-        return False
-
-    render_feature(tilemap, regionmap, weightmap, feature, candidates[0][0], candidates[0][1])
-    return (candidates[0][0], candidates[0][1])
-
+def fix_regionmap(regionmap, feature, x, y, new_region):
+    for y2,row in enumerate(feature):
+        for x2,tile in enumerate(row):
+            if feature[y2][x2] is not None:
+                regionmap[y+y2][x+x2] = new_region
 
 def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
     candidates = set()
@@ -419,7 +421,7 @@ def place_cave(r, regionmap, tilemap, weightmap, maxweight, cave):
     if weightmap[candidates[0][1]][candidates[0][0]] > maxweight:
         return False
 
-    render_feature(tilemap, regionmap, weightmap, [[cave]], candidates[0][0], candidates[0][1])
+    render_feature(tilemap, weightmap, [[cave]], candidates[0][0], candidates[0][1])
     return (candidates[0][0], candidates[0][1])
 
 
@@ -506,10 +508,10 @@ def get_subregions(region, other_regionmap):
         subregions.add(other_regionmap[p[1]][p[0]])
     return subregions
 
-def place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weight, feature):
+def place_in_random_region(self, subregions, biome_regionmap, weight, feature):
     random.shuffle(subregions)
     for sr in subregions:
-        loc = place_feature_in_region(sr, biome_regionmap, tilemap, weightmap, weight, feature)
+        loc = place_feature_in_region(self, sr, biome_regionmap, weight, feature)
         if loc is not False:
             return (loc, sr.regionid)
     return False
@@ -560,7 +562,7 @@ def place_mirage(self):
         if region.tile == DESERT_REGION:
             regions.append(region)
 
-    pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MIRAGE_TOWER)
+    pc = place_in_random_region(self, regions, self.biome_regionmap, 0, MIRAGE_TOWER)
 
     if pc is False:
         return False
@@ -587,7 +589,7 @@ def place_anywhere(self, name, feature, nonreachable):
             continue
         regions.append(rg)
 
-    pc = place_in_random_region(regions, self.traversable_regionmap, self.tilemap, self.weightmap, 0, feature)
+    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, feature)
 
     if pc is False:
         return False
@@ -599,20 +601,6 @@ def place_anywhere(self, name, feature, nonreachable):
 
     return self.next_feature_todo()
 
-def place_leifen(self):
-    regions = []
-    for region in self.biome_regionlist:
-        if region.tile in (LAND_REGION, FOREST_REGION, GRASS_REGION, MARSH_REGION):
-            regions.append(region)
-
-    pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, LEIFEN_TOWN)
-
-    if pc is False:
-        return False
-
-    print("Placed Leifen", pc)
-
-    return self.next_feature_todo()
 
 features_todo = [
     (place_anywhere, "Gaia", GAIA_TOWN, True),
@@ -664,7 +652,7 @@ class PlacementState():
 
     def place_coneria(self, traversable_region):
         subregions = [self.biome_regionlist[r] for r in get_subregions(traversable_region, self.biome_regionmap)]
-        self.coneria = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, CONERIA_CITY)
+        self.coneria = place_in_random_region(self, subregions, self.biome_regionmap, 0, CONERIA_CITY)
         self.reachable.append(traversable_region.regionid)
         if self.coneria is not False:
             print("placed coneria at", self.coneria)
@@ -672,7 +660,7 @@ class PlacementState():
         return False
 
     def place_fiends(self, region, subregions):
-        self.fiends = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, TEMPLE_OF_FIENDS)
+        self.fiends = place_in_random_region(self, subregions, self.biome_regionmap, 0, TEMPLE_OF_FIENDS)
         if self.fiends is not False:
             print("placed ToF at", self.fiends)
             return [functools.partial(self.copy().place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
@@ -729,8 +717,8 @@ class PlacementState():
             ):
                 c1 = self.traversable_regionmap[y+c[1]][x+c[0]]
                 if c1 == 0:
-                    self.pravoka = place_feature_in_region(pravoka_region, self.traversable_regionmap, self.tilemap,
-                                                           self.weightmap, 0, PRAVOKA_CITY, place_at=(p[0], p[1]))
+                    self.pravoka = place_feature_in_region(self, pravoka_region, self.traversable_regionmap,
+                                                           0, PRAVOKA_CITY, place_at=(p[0], p[1]))
                     if self.pravoka is not False:
                         self.tilemap[y+c[1]][x+c[2]] = LAND
                         print("Placed Pravoka at", self.pravoka)
@@ -746,8 +734,8 @@ class PlacementState():
                       (0, -1, -1, -2, NS_DOCK),
             ):
                 if self.tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
-                    dock = place_feature_in_region(region, self.traversable_regionmap, self.tilemap,
-                                                  self.weightmap, 0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
+                    dock = place_feature_in_region(self, region, self.traversable_regionmap,
+                                                   0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
                     if dock is not False:
                         print("placed a dock at", dock)
                         return True
@@ -763,7 +751,7 @@ class PlacementState():
         else:
             subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
                           if self.biome_regionlist[r].tile in biome]
-            pc = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, tiles)
+            pc = place_in_random_region(self, subregions, self.biome_regionmap, 0, tiles)
 
         if pc is False:
             return False
@@ -820,8 +808,8 @@ class PlacementState():
             if self.tilemap[y+2][x+w] != OCEAN:
                 continue
 
-            pc = place_feature_in_region(region, self.traversable_regionmap, self.tilemap,
-                                         self.weightmap, 0, ONRAC_TOWN, place_at=(x, y))
+            pc = place_feature_in_region(self, region, self.traversable_regionmap,
+                                         0, ONRAC_TOWN, place_at=(x, y))
             if pc is not False:
                 print("Placed Onrac at", pc)
                 return self.next_feature_todo()
