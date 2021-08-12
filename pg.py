@@ -488,6 +488,11 @@ def apply_borders(tilemap):
 
     return tilemap
 
+def airship_accessible(region, tilemap):
+    for p in region.points:
+        if tile[p[1]][p[0]] in (LAND, GRASS):
+            return True
+    return False
 
 def pit_cave_feature(cave):
     return [[None, None, None],
@@ -579,31 +584,78 @@ def onrac_candidates(self):
     random.shuffle(regions)
     return [functools.partial(self.copy().place_onrac, r) for r in regions]
 
+def has_river_dock(region, regionlist):
+    for adj in region.adjacent:
+        if regionlist[adj].tile == CANOE_REGION:
+            if 0 in regionlist[adj].adjacent:
+                return True
+    return False
 
-def place_anywhere(self, name, feature, nonreachable):
+def place_leifen(self):
     regions = []
     for rg in self.traversable_regionlist:
         if rg.tile != WALKABLE_REGION:
             continue
-        if nonreachable and rg.regionid in self.reachable:
-            continue
         regions.append(rg)
 
-    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, feature)
+    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, LEIFEN_CITY)
 
     if pc is False:
         return False
 
-    if nonreachable:
-        self.dock_exclude.append(pc[1])
+    print("Placed Leifen", pc)
 
-    print("Placed", name, pc)
+    return self.next_feature_todo()
+
+def place_gaia(self):
+    regions = []
+    for rg in self.traversable_regionlist:
+        if rg.tile != WALKABLE_REGION:
+            continue
+        if rg.regionid in self.reachable:
+            continue
+        if has_river_dock(rg, self.traversable_regionlist):
+            continue
+        regions.append(rg)
+
+    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, GAIA_TOWN)
+
+    if pc is False:
+        return False
+
+    self.dock_exclude.append(pc[1])
+
+    print("Placed Gaia", pc)
+
+    return self.next_feature_todo()
+
+
+def place_ordeals(self):
+    regions = []
+    for rg in self.traversable_regionlist:
+        if rg.tile != WALKABLE_REGION:
+            continue
+        if rg.regionid in self.reachable:
+            continue
+        if not has_river_dock(rg, self.traversable_regionlist):
+            continue
+        regions.append(rg)
+
+    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, ORDEALS_CASTLE)
+
+    if pc is False:
+        return False
+
+    self.dock_exclude.append(pc[1])
+
+    print("Placed Ordeals", pc)
 
     return self.next_feature_todo()
 
 
 features_todo = [
-    (place_anywhere, "Gaia", GAIA_TOWN, True),
+    (place_gaia,),
+    (place_ordeals,),
     (titan_west_candidates,),
     (place_mirage,),
     (onrac_candidates,),
@@ -616,7 +668,7 @@ features_todo = [
     (place_dock_accessible_feature, ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION))),
     (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
     (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
-    (place_anywhere, "Leifen", LEIFEN_CITY, False),
+    (place_leifen,),
 ]
 
 class PlacementState():
