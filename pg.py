@@ -514,19 +514,98 @@ def place_in_random_region(subregions, biome_regionmap, tilemap, weightmap, weig
             return loc
     return False
 
-ship_accessible_features = [
-    ("Matoyas cave", MATOYAS_CAVE, "cave"),
-    ("Dwarf cave", DWARF_CAVE, "cave"),
-    ("Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION)),
-    ("Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,)),
-    ("Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
-    ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION)),
-    ("Earth cave", EARTH_CAVE, "cave"),
-    ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION)),
+def place_dock_accessible_feature(self, feature):
+    candidate_regions = []
+    total = 0
+    for a in self.traversable_regionlist[0].adjacent:
+        rg = self.traversable_regionlist[a]
+        if rg.tile != WALKABLE_REGION:
+            continue
+        candidate_regions.append(rg)
+        total += len(rg.points)
+
+    attempts = []
+
+    random.shuffle(candidate_regions)
+
+    while candidate_regions:
+        pick = random.randrange(0, total)
+        i = 0
+        pick -= len(candidate_regions[i].points)
+        while pick > 0:
+            i += 1
+            pick -= len(candidate_regions[i].points)
+        total -= len(candidate_regions[i].points)
+        reg = candidate_regions.pop(i)
+        attempts.append(functools.partial(self.copy().place_ship_accessible_feature, feature, reg))
+
+    return attempts
+
+def place_titan_east(self):
+    start_region = None
+    reachable = list(self.reachable)
+    random.shuffle(reachable)
+    for rg in reachable:
+        start_region = rg
+        pc = place_cave(self.traversable_regionlist[rg], self.traversable_regionmap,
+                        self.tilemap, self.weightmap, 0, TITAN_CAVE_E)
+        if pc is not False:
+            break
+
+    if pc is False:
+        return False
+
+    print("Placed Titan east", pc)
+
+    attempts = []
+    for rg,region in enumerate(self.traversable_regionlist):
+        if region.tile != WALKABLE_REGION:
+            continue
+        if rg in self.reachable:
+            continue
+        attempts.append(functools.partial(self.copy().place_titan_west, region))
+    return attempts
+
+def place_mirage(self):
+    regions = []
+    for region in self.biome_regionlist:
+        if region.tile == DESERT_REGION:
+            regions.append(region)
+
+    pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MIRAGE_TOWER)
+
+    if pc is False:
+        return False
+
+    print("Placed Mirage", pc)
+
+    return self.next_feature_todo()
+
+def onrac_candidates(self):
+    regions = []
+    for region in self.biome_regionlist:
+        if region.tile in (LAND_REGION, FOREST_REGION, GRASS_REGION, MARSH_REGION):
+            regions.append(region)
+
+    return [functools.partial(self.place_onrac, r) for r in regions]
+
+features_todo = [
+    (place_titan_east,),
+    (place_mirage,),
+    (onrac_candidates,),
+    (place_dock_accessible_feature, ("Matoyas cave", MATOYAS_CAVE, "cave")),
+    (place_dock_accessible_feature, ("Dwarf cave", DWARF_CAVE, "cave")),
+    (place_dock_accessible_feature, ("Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION))),
+    (place_dock_accessible_feature, ("Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,))),
+    (place_dock_accessible_feature, ("Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
+    (place_dock_accessible_feature, ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION))),
+    (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
+    (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
 ]
 
 class PlacementState():
-    def __init__(self, tilemap, biome_regionmap, biome_regionlist, traversable_regionmap, traversable_regionlist, weightmap, ship_accessible_features):
+    def __init__(self, tilemap, biome_regionmap, biome_regionlist, traversable_regionmap, traversable_regionlist,
+                 weightmap, features_todo):
         self.tilemap = tilemap
         self.biome_regionmap = biome_regionmap
         self.biome_regionlist = biome_regionlist
@@ -538,15 +617,22 @@ class PlacementState():
         self.bridge = False
         self.pravoka = False
         self.reachable = []
-        self.ship_accessible_features = ship_accessible_features
+        self.exclude = []
+        self.features_todo = features_todo
 
     def copy(self):
         c = copy.copy(self)
         c.tilemap = copy.deepcopy(c.tilemap)
         c.reachable = copy.deepcopy(c.reachable)
+        c.exclude = copy.deepcopy(c.exclude)
         c.weightmap = copy.deepcopy(c.weightmap)
-        c.ship_accessible_features = copy.copy(c.ship_accessible_features)
+        c.features_todo = copy.copy(c.features_todo)
         return c
+
+    def start(self):
+        walkable_regions = [r for r in self.traversable_regionlist if r.tile == WALKABLE_REGION]
+        random.shuffle(walkable_regions)
+        return [functools.partial(self.copy().place_coneria, w) for w in walkable_regions]
 
     def place_coneria(self, traversable_region):
         subregions = [self.biome_regionlist[r] for r in get_subregions(traversable_region, self.biome_regionmap)]
@@ -554,7 +640,7 @@ class PlacementState():
         self.reachable.append(traversable_region.regionid)
         if self.coneria is not False:
             print("placed coneria at", self.coneria)
-            return [functools.partial(self.copy().place_fiends, traversable_region, subregions)]
+            return self.place_fiends(traversable_region, subregions)
         return False
 
     def place_fiends(self, region, subregions):
@@ -620,36 +706,9 @@ class PlacementState():
                     if self.pravoka is not False:
                         self.tilemap[y+c[1]][x+c[2]] = LAND
                         print("Placed Pravoka at", self.pravoka)
-                        popped_feature = self.ship_accessible_features.pop(0)
-                        return self.dock_accessible_candidates(popped_feature)
+                        return self.next_feature_todo()
         return False
 
-    def dock_accessible_candidates(self, feature):
-        candidate_regions = []
-        total = 0
-        for a in self.traversable_regionlist[0].adjacent:
-            rg = self.traversable_regionlist[a]
-            if rg.tile != WALKABLE_REGION:
-                continue
-            candidate_regions.append(rg)
-            total += len(rg.points)
-
-        attempts = []
-
-        random.shuffle(candidate_regions)
-
-        while candidate_regions:
-            pick = random.randrange(0, total)
-            i = 0
-            pick -= len(candidate_regions[i].points)
-            while pick > 0:
-                i += 1
-                pick -= len(candidate_regions[i].points)
-            total -= len(candidate_regions[i].points)
-            reg = candidate_regions.pop(i)
-            attempts.append(functools.partial(self.copy().place_ship_accessible_feature, feature, reg))
-
-        return attempts
 
     def place_dock(self, region):
         for p in region.border_points:
@@ -676,6 +735,7 @@ class PlacementState():
         else:
             subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
                           if self.biome_regionlist[r].tile in biome]
+            # TODO throw out "excluded" regions
             pc = place_in_random_region(subregions, self.biome_regionmap, self.tilemap, self.weightmap, 0, tiles)
 
         if pc is False:
@@ -686,36 +746,7 @@ class PlacementState():
 
         print("Placed", name, "at", pc)
 
-        if len(self.ship_accessible_features) > 0:
-            popped_feature = self.ship_accessible_features.pop(0)
-            return self.dock_accessible_candidates(popped_feature)
-        else:
-            return [self.place_titan_east]
-
-    def place_titan_east(self):
-        start_region = None
-        reachable = list(self.reachable)
-        random.shuffle(reachable)
-        for rg in reachable:
-            start_region = rg
-            pc = place_cave(self.traversable_regionlist[rg], self.traversable_regionmap,
-                            self.tilemap, self.weightmap, 0, TITAN_CAVE_E)
-            if pc is not False:
-                break
-
-        if pc is False:
-            return False
-
-        print("Placed Titan east", pc)
-
-        attempts = []
-        for rg,region in enumerate(self.traversable_regionlist):
-            if region.tile != WALKABLE_REGION:
-                continue
-            if rg in self.reachable:
-                continue
-            attempts.append(functools.partial(self.copy().place_titan_west, region))
-        return attempts
+        return self.next_feature_todo()
 
     def place_titan_west(self, region):
         pc = place_cave(region, self.traversable_regionmap,
@@ -733,35 +764,21 @@ class PlacementState():
 
         print("Placed Sarda", pc)
 
-        return self.place_mirage()
+        self.exclude.append(region.regionid)
+
+        return self.next_feature_todo()
 
     def place_volcano(self):
         for region in enumerate(self.biome_regionlist):
             if region.tile != MOUNTAIN_REGION:
                 pass
 
-    def place_mirage(self):
-        regions = []
-        for region in self.biome_regionlist:
-            if region.tile == DESERT_REGION:
-                regions.append(region)
+    def next_feature_todo(self):
+        if len(self.features_todo) == 0:
+            return self
+        next_todo = self.features_todo.pop(0)
+        return next_todo[0](self.copy(), *next_todo[1:])
 
-        pc = place_in_random_region(regions, self.biome_regionmap, self.tilemap, self.weightmap, 0, MIRAGE_TOWER)
-
-        if pc is False:
-            return False
-
-        print("Placed Mirage", pc)
-
-        return self.onrac_candidates()
-
-    def onrac_candidates(self):
-        regions = []
-        for region in self.biome_regionlist:
-            if region.tile in (LAND_REGION, FOREST_REGION, GRASS_REGION, MARSH_REGION):
-                regions.append(region)
-
-        return [functools.partial(self.place_onrac, r) for r in regions]
 
     def place_onrac(self, region):
         points = list(region.points)
@@ -778,8 +795,7 @@ class PlacementState():
                                          self.weightmap, 0, ONRAC_TOWN, place_at=(x, y))
             if pc is not False:
                 print("Placed Onrac at", pc)
-                return self
-
+                return self.next_feature_todo()
         return False
 
 def place_features(tilemap):
@@ -797,19 +813,14 @@ def place_features(tilemap):
     #             pit_cave_feature(CARDIA_5)
     # ]
 
-    walkable_regions = [r for r in traversable_regionlist if r.tile == WALKABLE_REGION]
-    random.shuffle(walkable_regions)
 
     weightmap = []
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
 
-    pending = []
-    for w in walkable_regions:
-        pending.append(functools.partial(PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
-                                                        traversable_regionmap, traversable_regionlist, weightmap,
-                                                        ship_accessible_features).place_coneria,
-                                         w))
+    pending = [PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
+                              traversable_regionmap, traversable_regionlist, weightmap,
+                              features_todo).start]
 
     finalstate = None
     while pending:
@@ -1133,7 +1144,7 @@ def procgen():
 
     return True
 
-random.seed(125)
+#random.seed(125)
 success = procgen()
 #while success is False:
 #success = procgen()

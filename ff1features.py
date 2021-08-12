@@ -126,9 +126,9 @@ OASIS = [
 ]
 
 NS_DOCK = [
-    [DOCK_W, OCEAN],
-    [DOCK_W, OCEAN],
-    [DOCK_W, OCEAN],
+    [DOCK_E, OCEAN],
+    [DOCK_E, OCEAN],
+    [DOCK_E, OCEAN],
 ]
 
 EW_DOCK = [
