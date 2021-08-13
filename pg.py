@@ -488,10 +488,20 @@ def apply_borders(tilemap):
 
     return tilemap
 
-def airship_accessible(region, tilemap):
+def airship_accessible(region, tilemap, checked=None):
+    if checked is None:
+        checked = []
+    if region.regionid in checked:
+        return False
+    checked.append(region.regionid)
     for p in region.points:
         if tilemap[p[1]][p[0]] in (LAND, GRASS):
             return True
+    for adj in region.adjacent:
+        if regionlist[adj].tile == CANOE_REGION:
+            if airship_accessible(regionlist[adj], tilemap, checked):
+                return True
+
     return False
 
 def pit_cave_feature(cave):
@@ -550,6 +560,10 @@ def place_dock_accessible_feature(self, feature):
 
     return attempts
 
+def coneria_candidates(self):
+    walkable_regions = [r for r in self.traversable_regionlist if r.tile == WALKABLE_REGION]
+    random.shuffle(walkable_regions)
+    return [functools.partial(self.copy().place_coneria, w) for w in walkable_regions]
 
 def titan_west_candidates(self):
     attempts = []
@@ -584,10 +598,23 @@ def onrac_candidates(self):
     random.shuffle(regions)
     return [functools.partial(self.copy().place_onrac, r) for r in regions]
 
-def has_river_dock(region, regionlist):
+def has_river_dock(region, regionlist, checked=None):
+    if checked is None:
+        checked = []
+    if region.regionid in checked:
+        return False
+    checked.append(region.regionid)
+
+    if region.tile != WALKABLE_REGION:
+        return False
+
     for adj in region.adjacent:
-        if regionlist[adj].tile == CANOE_REGION:
-            if 0 in regionlist[adj].adjacent:
+        if regionlist[adj].tile != CANOE_REGION:
+            continue
+        if 0 in regionlist[adj].adjacent:
+            return True
+        for adj2 in regionlist[adj].adjacent:
+            if has_river_dock(regionlist[adj2], regionlist, checked):
                 return True
     return False
 
@@ -683,8 +710,17 @@ def place_waterfall(self):
                 return self.next_feature_todo()
     return False
 
+def volcano_candidates(self):
+    c = [functools.partial(self.copy().place_volcano, region)
+         for region in self.biome_regionlist
+         if region.tile == MOUNTAIN_REGION]
+    random.shuffle(c)
+    return c
+
 
 features_todo = [
+    (volcano_candidates,),
+    (coneria_candidates,),
     (place_gaia,),
     (place_ordeals,),
     (titan_west_candidates,),
@@ -729,11 +765,6 @@ class PlacementState():
         c.features_todo = copy.copy(c.features_todo)
         return c
 
-    def start(self):
-        walkable_regions = [r for r in self.traversable_regionlist if r.tile == WALKABLE_REGION]
-        random.shuffle(walkable_regions)
-        return [functools.partial(self.copy().place_coneria, w) for w in walkable_regions]
-
     def place_coneria(self, traversable_region):
         subregions = [self.biome_regionlist[r] for r in get_subregions(traversable_region, self.biome_regionmap)]
         self.coneria = place_in_random_region(self, subregions, self.biome_regionmap, 0, CONERIA_CITY)
@@ -747,13 +778,15 @@ class PlacementState():
         self.fiends = place_in_random_region(self, subregions, self.biome_regionmap, 0, TEMPLE_OF_FIENDS)
         if self.fiends is not False:
             print("placed ToF at", self.fiends)
-            return [functools.partial(self.copy().place_pravoka, region)]+[functools.partial(self.copy().bridge_candidates, region)]
+            return [functools.partial(self.copy().bridge_candidates, region)]
         return False
 
     def bridge_candidates(self, coneria_region):
-        return [functools.partial(self.copy().place_bridge, coneria_region, self.traversable_regionlist[a])
+        c = [functools.partial(self.copy().place_bridge, coneria_region, self.traversable_regionlist[a])
                 for a in coneria_region.adjacent
                 if self.traversable_regionlist[a].tile == CANOE_REGION]
+        random.shuffle(c)
+        return c
 
     def place_bridge(self, coneria_region, r):
         bridged_region = None
@@ -761,22 +794,18 @@ class PlacementState():
         random.shuffle(pickpoint)
         for p in pickpoint:
             c1 = self.traversable_regionmap[p[1]-1][p[0]]
-            for ad in (1,):
-                c2 = self.traversable_regionmap[p[1]+ad][p[0]]
-                if ad == 2:
-                    if self.tilemap[p[1]+1][p[0]] != RIVER:
-                        continue
-                if (c1 == coneria_region.regionid and c2 != coneria_region.regionid and
-                    self.traversable_regionlist[c2].tile == WALKABLE_REGION):
-                    self.bridge = p
-                    bridged_region = self.traversable_regionlist[c2]
-                    break
+            c2 = self.traversable_regionmap[p[1]+1][p[0]]
+            if (c1 == coneria_region.regionid and c2 != coneria_region.regionid and
+                self.traversable_regionlist[c2].tile == WALKABLE_REGION):
+                self.bridge = p
+                bridged_region = self.traversable_regionlist[c2]
+                break
 
-                if (c2 == coneria_region.regionid and c1 != coneria_region.regionid and
-                    self.traversable_regionlist[c1].tile == WALKABLE_REGION):
-                    self.bridge = p
-                    bridged_region = self.traversable_regionlist[c1]
-                    break
+            if (c2 == coneria_region.regionid and c1 != coneria_region.regionid and
+                self.traversable_regionlist[c1].tile == WALKABLE_REGION):
+                self.bridge = p
+                bridged_region = self.traversable_regionlist[c1]
+                break
 
         if self.bridge is not False:
             self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
@@ -874,10 +903,32 @@ class PlacementState():
 
         return self.next_feature_todo()
 
-    def place_volcano(self):
-        for region in enumerate(self.biome_regionlist):
-            if region.tile != MOUNTAIN_REGION:
-                pass
+
+    def place_volcano(self, region):
+        points = list(region.points)
+        random.shuffle(points)
+        for p in points:
+            x = p[0]
+            y = p[1]
+
+            w = len(VOLCANO[0])
+            h = len(VOLCANO)
+
+            for c in ((-1, 0),
+                      (0, -1),
+                      (w, 0),
+                      (0, h),
+            ):
+                sample = self.traversable_regionlist[self.traversable_regionmap[y+c[1]][x+c[0]]]
+                if sample.tile == CANOE_REGION:
+                    pass
+                volc = place_feature_in_region(self, region, self.biome_regionmap,
+                                               0, VOLCANO, place_at=(x, y))
+                if volc is not False:
+                    print("Placed Volcano", volc)
+                    return self.next_feature_todo()
+        return False
+
 
     def next_feature_todo(self):
         if len(self.features_todo) == 0:
@@ -899,6 +950,11 @@ class PlacementState():
 
             pc = place_feature_in_region(self, region, self.traversable_regionmap,
                                          0, ONRAC_TOWN, place_at=(x, y))
+
+            #if not airship_accessible(region, self.tilemap):
+            #    print("not accessible")
+            #    return False
+
             if pc is not False:
                 print("Placed Onrac at", pc)
                 return self.next_feature_todo()
@@ -913,9 +969,11 @@ def place_features(tilemap):
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
 
+    print("Walkable regions count", len([t for t in traversable_regionlist if t.tile == WALKABLE_REGION]))
+
     pending = [PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
                               traversable_regionmap, traversable_regionlist, weightmap,
-                              features_todo).start]
+                              features_todo).next_feature_todo]
 
     finalstate = None
     while pending:
@@ -1106,7 +1164,7 @@ def procgen():
 
     return True
 
-#random.seed(125)
+random.seed(125)
 success = procgen()
 #while success is False:
 #success = procgen()

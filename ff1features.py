@@ -102,9 +102,9 @@ CRESCENT_LAKE_CITY = [
     ]
 
 GAIA_TOWN = [
-    [GRASS, GAIA, GAIA],
-    [GAIA, GAIA, GRASS],
-    [None, None, None],
+    [LAND, GAIA, GAIA],
+    [GAIA, GAIA, LAND],
+    [LAND, LAND, None],
 ]
 
 MIRAGE_TOWER = [
