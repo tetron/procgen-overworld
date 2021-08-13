@@ -537,7 +537,7 @@ def place_in_random_region(self, subregions, biome_regionmap, weight, feature):
             return (loc, sr.regionid)
     return False
 
-def place_dock_accessible_feature(self, feature):
+def place_dock_accessible_feature(self, name, tiles, biome, place_func):
     candidate_regions = []
     total = 0
     for a in self.traversable_regionlist[0].adjacent:
@@ -562,7 +562,7 @@ def place_dock_accessible_feature(self, feature):
             pick -= len(candidate_regions[i].points)
         total -= len(candidate_regions[i].points)
         reg = candidate_regions.pop(i)
-        attempts.append(functools.partial(self.copy().place_ship_accessible_feature, feature, reg))
+        attempts.append(functools.partial(place_func, self.copy(), name, tiles, biome, reg))
 
     return attempts
 
@@ -753,6 +753,46 @@ def airship_desert(self):
 
     return self.next_feature_todo()
 
+def place_ship_accessible_feature(self, name, tiles, biome, region):
+    if biome == "cave":
+        pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, tiles)
+    else:
+        subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
+                      if self.biome_regionlist[r].tile in biome]
+        #print("reg:", region.nwcorner, region.secorner)
+        #for sr in subregions:
+        #    print("sub:", sr.nwcorner, sr.secorner)
+        pc = place_in_random_region(self, subregions, self.biome_regionmap, 0, tiles)
+
+    if pc is False:
+        return False
+
+    if not self.place_dock(region):
+        return False
+
+    self.reachable.append(region.regionid)
+
+    print("Placed", name, "at", pc, "region", region.regionid)
+
+    return self.next_feature_todo()
+
+
+def place_earth_cave(self, name, tiles, biome, region):
+    pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, EARTH_CAVE)
+
+    if pc is False:
+        return False
+
+    if not self.place_canal(region):
+        return False
+
+    self.dock_exclude.append(region.regionid)
+
+    print("Placed", name, "at", pc, "region", region.regionid)
+
+    return self.next_feature_todo()
+
+
 features_todo = [
     (coneria_candidates,),
     (place_gaia,),
@@ -761,15 +801,23 @@ features_todo = [
     (place_in_desert, "Mirage", MIRAGE_TOWER),
     (place_in_desert, "Caravan", OASIS),
     (onrac_candidates,),
-    (place_dock_accessible_feature, ("Titan's cave east", TITAN_CAVE_E, "cave")),
-    (place_dock_accessible_feature, ("Matoyas cave", MATOYAS_CAVE, "cave")),
-    (place_dock_accessible_feature, ("Dwarf cave", DWARF_CAVE, "cave")),
-    (place_dock_accessible_feature, ("Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION))),
-    (place_dock_accessible_feature, ("Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,))),
-    (place_dock_accessible_feature, ("Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
-    (place_dock_accessible_feature, ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION))),
-    (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
-    (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
+    (place_dock_accessible_feature, "Earth cave", EARTH_CAVE, "cave", place_earth_cave),
+    (place_dock_accessible_feature, "Titan's cave east", TITAN_CAVE_E, "cave",
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Matoyas cave", MATOYAS_CAVE, "cave",
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Dwarf cave", DWARF_CAVE, "cave",
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Elfland", ELFLAND_TOWN_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION),
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Marsh cave", pit_cave_feature(MARSH_CAVE), (MARSH_REGION,),
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Astos castle", ASTOS_CASTLE, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION),
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION),
+     place_ship_accessible_feature),
+    (place_dock_accessible_feature, "Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION),
+     place_ship_accessible_feature),
     (place_anywhere, "Leifen", LEIFEN_CITY),
     (place_anywhere, "Bahamut", pit_cave_feature(BAHAMUTS_CAVE)),
     (place_anywhere, "Cardia 1", pit_cave_feature(CARDIA_1)),
@@ -855,7 +903,8 @@ class PlacementState():
                 break
 
         if self.bridge is not False:
-            self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
+            # Bridge location
+            #self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
             print("placed bridge at", self.bridge)
             self.reachable.append(bridged_region.regionid)
             return [functools.partial(self.copy().place_pravoka, bridged_region)]
@@ -903,32 +952,24 @@ class PlacementState():
                         return True
         return False
 
-    def place_ship_accessible_feature(self, feature, region):
-        name = feature[0]
-        tiles = feature[1]
-        biome = feature[2]
+    def place_canal(self, region):
+        points = list(region.points)
+        random.shuffle(points)
+        for p in points:
+            for c in ((-1, 0,  0, -1, W_CANAL_STRUCTURE,  1),
+                      (1,  0, -5, -1, E_CANAL_STRUCTURE, -1),
+            ):
+                if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
+                    dock = place_feature_in_region(self, region, self.traversable_regionmap,
+                                                   0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
+                    if dock is not False:
+                        # canal location
+                        #self.tilemap[p[1]][p[0] + c[5]] = LAND
 
-        if biome == "cave":
-            pc = place_cave(region, self.traversable_regionmap, self.tilemap, self.weightmap, 0, DWARF_CAVE)
-        else:
-            subregions = [self.biome_regionlist[r] for r in get_subregions(region, self.biome_regionmap)
-                          if self.biome_regionlist[r].tile in biome]
-            #print("reg:", region.nwcorner, region.secorner)
-            #for sr in subregions:
-            #    print("sub:", sr.nwcorner, sr.secorner)
-            pc = place_in_random_region(self, subregions, self.biome_regionmap, 0, tiles)
+                        print("placed a dock at", dock, "in region", region.regionid)
+                        return True
+        return False
 
-        if pc is False:
-            return False
-
-        if not self.place_dock(region):
-            return False
-
-        self.reachable.append(region.regionid)
-
-        print("Placed", name, "at", pc, "region", region.regionid)
-
-        return self.next_feature_todo()
 
     def place_titan_west(self, region):
         pc = place_cave(region, self.traversable_regionmap,

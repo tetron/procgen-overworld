@@ -142,6 +142,18 @@ EW_DOCK_STRUCTURE = [
     [OCEAN,   OCEAN,  OCEAN],
 ]
 
+E_CANAL_STRUCTURE = [
+    [DOCK_S, DOCK_S, DOCK_S, None, None,    None],
+    [OCEAN,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
+    [None,     None,   None,  None,  None,  None],
+]
+
+W_CANAL_STRUCTURE = [
+    [None, None,    None, DOCK_S, DOCK_S, DOCK_S],
+    [OCEAN,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
+    [None,     None,   None,  None,  None,  None],
+]
+
 ICE_CAVE_STRUCTURE = [
     [None, None, None, None, None],
     [None, None, ICE_CAVE, None, None],
