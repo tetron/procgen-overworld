@@ -139,3 +139,9 @@ EW_DOCK_STRUCTURE = [
     [DOCK_S, DOCK_S, DOCK_S],
     [OCEAN,   OCEAN,  OCEAN],
 ]
+
+ICE_CAVE_STRUCTURE = [
+    [None, None, None, None, None],
+    [None, None, ICE_CAVE, None, None],
+    [None, GRASS, GRASS, GRASS, None],
+]

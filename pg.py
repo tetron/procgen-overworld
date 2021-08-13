@@ -710,8 +710,8 @@ def place_waterfall(self):
                 return self.next_feature_todo()
     return False
 
-def volcano_candidates(self):
-    c = [functools.partial(self.copy().place_volcano, region)
+def mountain_candidates(self, name, feature):
+    c = [functools.partial(self.copy().place_in_mountains, region, name, feature)
          for region in self.biome_regionlist
          if region.tile == MOUNTAIN_REGION]
     random.shuffle(c)
@@ -719,7 +719,6 @@ def volcano_candidates(self):
 
 
 features_todo = [
-    (volcano_candidates,),
     (coneria_candidates,),
     (place_gaia,),
     (place_ordeals,),
@@ -737,6 +736,8 @@ features_todo = [
     (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
     (place_leifen,),
     (place_waterfall,),
+    (mountain_candidates,"Volcano", VOLCANO),
+    (mountain_candidates,"Ice cave", ICE_CAVE_STRUCTURE),
 ]
 
 class PlacementState():
@@ -904,28 +905,25 @@ class PlacementState():
         return self.next_feature_todo()
 
 
-    def place_volcano(self, region):
+    def place_in_mountains(self, region, name, feature):
         points = list(region.points)
         random.shuffle(points)
         for p in points:
             x = p[0]
             y = p[1]
 
-            w = len(VOLCANO[0])
-            h = len(VOLCANO)
+            w = len(feature[0])
+            h = len(feature)
 
-            for c in ((-1, 0),
-                      (0, -1),
-                      (w, 0),
-                      (0, h),
+            for c in ((w//2, h),
             ):
                 sample = self.traversable_regionlist[self.traversable_regionmap[y+c[1]][x+c[0]]]
-                if sample.tile == CANOE_REGION:
-                    pass
-                volc = place_feature_in_region(self, region, self.biome_regionmap,
-                                               0, VOLCANO, place_at=(x, y))
-                if volc is not False:
-                    print("Placed Volcano", volc)
+                if sample.tile != CANOE_REGION:
+                    continue
+                pc = place_feature_in_region(self, region, self.biome_regionmap,
+                                               0, feature, place_at=(x, y))
+                if pc is not False:
+                    print("Placed", name, pc)
                     return self.next_feature_todo()
         return False
 
