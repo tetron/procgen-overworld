@@ -137,20 +137,30 @@ N_DOCK_STRUCTURE = [
     [DOCK_E,  OCEAN, None],
 ]
 
-EW_DOCK_STRUCTURE = [
+S_DOCK_STRUCTURE = [
     [DOCK_S, DOCK_S, DOCK_S],
     [OCEAN,   OCEAN,  OCEAN],
 ]
 
+W_DOCK_STRUCTURE = [
+    [DOCK_S, DOCK_S,  DOCK_SW],
+    [OCEAN,   OCEAN,  DOCK_W],
+]
+
+E_DOCK_STRUCTURE = [
+    [DOCK_SE, DOCK_S, DOCK_S],
+    [DOCK_E,   OCEAN,  OCEAN],
+]
+
 E_CANAL_STRUCTURE = [
-    [DOCK_S, DOCK_S, DOCK_S, None, None,    None],
-    [OCEAN,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
+    [DOCK_SE, DOCK_S, DOCK_S, None, None,    None],
+    [DOCK_E,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
     [None,     None,   None,  None,  None,  None],
 ]
 
 W_CANAL_STRUCTURE = [
-    [None, None,    None, DOCK_S, DOCK_S, DOCK_S],
-    [OCEAN,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
+    [None, None,    None, DOCK_S, DOCK_S,  DOCK_SW],
+    [OCEAN,   OCEAN,  OCEAN, OCEAN, OCEAN, DOCK_W],
     [None,     None,   None,  None,  None,  None],
 ]
 

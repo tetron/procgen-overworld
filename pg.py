@@ -463,8 +463,11 @@ def add_biomes(tilemap, landregions):
 
 def apply_shores(tilemap):
     all_tiles = set(ALL_TILES)
-    non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W])
-    non_ocean_shore_tiles = all_tiles.difference([OCEAN, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE, RIVER])
+    non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W,
+                                            DOCK_W, DOCK_E, DOCK_SE, DOCK_S, DOCK_SW, DOCK_SQ
+    ])
+    non_ocean_shore_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_NW, SHORE_NE, SHORE_SW, SHORE_SE,
+                                                  DOCK_W, DOCK_E, DOCK_SE, DOCK_S, DOCK_SW, DOCK_SQ])
     tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles, "_": non_water_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles, "_": non_water_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles, "_": non_ocean_shore_tiles}, False)
@@ -939,9 +942,9 @@ class PlacementState():
         points = list(region.points)
         random.shuffle(points)
         for p in points:
-            for c in ((-1, 0,  0, -1, EW_DOCK_STRUCTURE),
-                      (0,  1, -1, 0, EW_DOCK_STRUCTURE),
-                      (1,  0, -2, -1, EW_DOCK_STRUCTURE),
+            for c in ((-1, 0,  0, -1, W_DOCK_STRUCTURE),
+                      (0,  1, -1, 0,  S_DOCK_STRUCTURE),
+                      (1,  0, -2, -1, E_DOCK_STRUCTURE),
                       (0, -1, -1, -2, N_DOCK_STRUCTURE),
             ):
                 if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
