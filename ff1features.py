@@ -144,4 +144,5 @@ ICE_CAVE_STRUCTURE = [
     [None, None, None, None, None],
     [None, None, ICE_CAVE, None, None],
     [None, GRASS, GRASS, GRASS, None],
+    [None, GRASS, GRASS, GRASS, None],
 ]

@@ -372,11 +372,17 @@ def place_feature_in_region(self, r, regionmap, maxweight, feature, place_at=Non
         #    for x in range(r.nwcorner[0], r.secorner[0]-w):
         points = list(r.points)
         random.shuffle(points)
-        for p in points:
-            if check_fit(regionmap, r, p[0], p[1], h, w):
-                if self.weightmap[p[1]+(h//2)][p[0]+(w//2)] > maxweight:
+
+        maxweight = 10
+        weight = 0
+        while candidate is None and weight < maxweight:
+            for p in points:
+                if self.weightmap[p[1]+(h//2)][p[0]+(w//2)] > weight:
                     continue
-                candidate = p
+                if check_fit(regionmap, r, p[0], p[1], h, w):
+                    candidate = p
+                    break
+            weight += 1
 
     if not candidate:
         return False
@@ -488,7 +494,7 @@ def apply_borders(tilemap):
 
     return tilemap
 
-def airship_accessible(region, tilemap, checked=None):
+def airship_accessible(region, tilemap, regionlist, checked=None):
     if checked is None:
         checked = []
     if region.regionid in checked:
@@ -499,7 +505,7 @@ def airship_accessible(region, tilemap, checked=None):
             return True
     for adj in region.adjacent:
         if regionlist[adj].tile == CANOE_REGION:
-            if airship_accessible(regionlist[adj], tilemap, checked):
+            if airship_accessible(regionlist[adj], tilemap, regionlist, checked):
                 return True
 
     return False
@@ -563,7 +569,7 @@ def place_dock_accessible_feature(self, feature):
 def coneria_candidates(self):
     walkable_regions = [r for r in self.traversable_regionlist if r.tile == WALKABLE_REGION]
     random.shuffle(walkable_regions)
-    return [functools.partial(self.copy().place_coneria, w) for w in walkable_regions]
+    return [functools.partial(self.copy().place_coneria, w, False) for w in walkable_regions]+[functools.partial(self.copy().place_coneria, w, True) for w in walkable_regions]
 
 def titan_west_candidates(self):
     attempts = []
@@ -618,19 +624,21 @@ def has_river_dock(region, regionlist, checked=None):
                 return True
     return False
 
-def place_leifen(self):
+def place_anywhere(self, name, feature):
     regions = []
     for rg in self.traversable_regionlist:
         if rg.tile != WALKABLE_REGION:
             continue
+        if not airship_accessible(rg, self.tilemap, self.traversable_regionlist):
+            continue
         regions.append(rg)
 
-    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, LEIFEN_CITY)
+    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, feature)
 
     if pc is False:
         return False
 
-    print("Placed Leifen", pc)
+    print("Placed", name, pc)
 
     return self.next_feature_todo()
 
@@ -690,7 +698,7 @@ def place_waterfall(self):
         else:
             for adj in rg.adjacent:
                 if (self.traversable_regionlist[adj].tile == WALKABLE_REGION and
-                    airship_accessible(self.traversable_regionlist[adj], self.tilemap)):
+                    airship_accessible(self.traversable_regionlist[adj], self.tilemap, self.traversable_regionlist)):
                     accessible = True
         if not accessible:
             continue
@@ -734,7 +742,13 @@ features_todo = [
     (place_dock_accessible_feature, ("Melmond", MELMOND_TOWN, (LAND_REGION, GRASS_REGION, MARSH_REGION))),
     (place_dock_accessible_feature, ("Earth cave", EARTH_CAVE, "cave")),
     (place_dock_accessible_feature, ("Crescent lake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION))),
-    (place_leifen,),
+    (place_anywhere, "Leifen", LEIFEN_CITY),
+    (place_anywhere, "Bahamut", pit_cave_feature(BAHAMUTS_CAVE)),
+    (place_anywhere, "Cardia 1", pit_cave_feature(CARDIA_1)),
+    (place_anywhere, "Cardia 2", pit_cave_feature(CARDIA_2)),
+    (place_anywhere, "Cardia 3", pit_cave_feature(CARDIA_3)),
+    (place_anywhere, "Cardia 4", pit_cave_feature(CARDIA_4)),
+    (place_anywhere, "Cardia 5", pit_cave_feature(CARDIA_5)),
     (place_waterfall,),
     (mountain_candidates,"Volcano", VOLCANO),
     (mountain_candidates,"Ice cave", ICE_CAVE_STRUCTURE),
@@ -766,20 +780,23 @@ class PlacementState():
         c.features_todo = copy.copy(c.features_todo)
         return c
 
-    def place_coneria(self, traversable_region):
+    def place_coneria(self, traversable_region, do_place_bridge):
         subregions = [self.biome_regionlist[r] for r in get_subregions(traversable_region, self.biome_regionmap)]
         self.coneria = place_in_random_region(self, subregions, self.biome_regionmap, 0, CONERIA_CITY)
         self.reachable.append(traversable_region.regionid)
         if self.coneria is not False:
             print("placed coneria at", self.coneria)
-            return self.place_fiends(traversable_region, subregions)
+            return self.place_fiends(traversable_region, subregions, do_place_bridge)
         return False
 
-    def place_fiends(self, region, subregions):
+    def place_fiends(self, region, subregions, do_place_bridge):
         self.fiends = place_in_random_region(self, subregions, self.biome_regionmap, 0, TEMPLE_OF_FIENDS)
         if self.fiends is not False:
             print("placed ToF at", self.fiends)
-            return [functools.partial(self.copy().bridge_candidates, region)]
+            if do_place_bridge:
+                return [functools.partial(self.copy().bridge_candidates, region)]
+            else:
+                return self.place_pravoka(region)
         return False
 
     def bridge_candidates(self, coneria_region):
@@ -849,7 +866,7 @@ class PlacementState():
                       (1,  0, -2, -1, EW_DOCK_STRUCTURE),
                       (0, -1, -1, -2, N_DOCK_STRUCTURE),
             ):
-                if self.tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
+                if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
                     dock = place_feature_in_region(self, region, self.traversable_regionmap,
                                                    0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
                     if dock is not False:
@@ -967,7 +984,11 @@ def place_features(tilemap):
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
 
-    print("Walkable regions count", len([t for t in traversable_regionlist if t.tile == WALKABLE_REGION]))
+    walkable_count = len([t for t in traversable_regionlist if t.tile == WALKABLE_REGION])
+    print("Walkable regions count", walkable_count)
+    if walkable_count < 15 or walkable_count > 40:
+        # too few regions or too many regions tend to fail
+        return None
 
     pending = [PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
                               traversable_regionmap, traversable_regionlist, weightmap,
