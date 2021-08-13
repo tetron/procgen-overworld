@@ -581,18 +581,18 @@ def titan_west_candidates(self):
         attempts.append(functools.partial(self.copy().place_titan_west, region))
     return attempts
 
-def place_mirage(self):
+def place_in_desert(self, name, feature):
     regions = []
     for region in self.biome_regionlist:
         if region.tile == DESERT_REGION:
             regions.append(region)
 
-    pc = place_in_random_region(self, regions, self.biome_regionmap, 0, MIRAGE_TOWER)
+    pc = place_in_random_region(self, regions, self.biome_regionmap, 0, feature)
 
     if pc is False:
         return False
 
-    print("Placed Mirage", pc)
+    print("Placed", name, pc)
 
     return self.next_feature_todo()
 
@@ -731,7 +731,8 @@ features_todo = [
     (place_gaia,),
     (place_ordeals,),
     (titan_west_candidates,),
-    (place_mirage,),
+    (place_in_desert, "Mirage", MIRAGE_TOWER),
+    (place_in_desert, "Caravan", OASIS),
     (onrac_candidates,),
     (place_dock_accessible_feature, ("Titan's cave east", TITAN_CAVE_E, "cave")),
     (place_dock_accessible_feature, ("Matoyas cave", MATOYAS_CAVE, "cave")),
@@ -921,7 +922,6 @@ class PlacementState():
 
         return self.next_feature_todo()
 
-
     def place_in_mountains(self, region, name, feature):
         points = list(region.points)
         random.shuffle(points)
@@ -945,13 +945,6 @@ class PlacementState():
         return False
 
 
-    def next_feature_todo(self):
-        if len(self.features_todo) == 0:
-            return self
-        next_todo = self.features_todo.pop(0)
-        return next_todo[0](self.copy(), *next_todo[1:])
-
-
     def place_onrac(self, region):
         points = list(region.points)
         random.shuffle(points)
@@ -966,14 +959,20 @@ class PlacementState():
             pc = place_feature_in_region(self, region, self.traversable_regionmap,
                                          0, ONRAC_TOWN, place_at=(x, y))
 
-            #if not airship_accessible(region, self.tilemap):
-            #    print("not accessible")
-            #    return False
+            if not airship_accessible(region, self.tilemap, self.traversable_regionlist):
+                return False
 
             if pc is not False:
                 print("Placed Onrac at", pc)
                 return self.next_feature_todo()
         return False
+
+    def next_feature_todo(self):
+        if len(self.features_todo) == 0:
+            return self
+        next_todo = self.features_todo.pop(0)
+        return next_todo[0](self.copy(), *next_todo[1:])
+
 
 def place_features(tilemap):
 
