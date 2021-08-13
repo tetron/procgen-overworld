@@ -725,6 +725,33 @@ def mountain_candidates(self, name, feature):
     random.shuffle(c)
     return c
 
+def airship_desert(self):
+    regions = []
+    for region in self.biome_regionlist:
+        if region.tile != DESERT_REGION:
+            continue
+        p = next(iter(region.points))
+        tv = self.traversable_regionlist[self.traversable_regionmap[p[1]][p[0]]]
+        if tv.regionid in self.reachable:
+            regions.append(region)
+            continue
+        if has_river_dock(tv, self.traversable_regionlist):
+            regions.append(region)
+            continue
+
+    if not regions:
+        return False
+
+    random.shuffle(regions)
+    rg = regions.pop()
+
+    for p in rg.points:
+        if self.tilemap[p[1]][p[0]] == DESERT:
+            self.tilemap[p[1]][p[0]] = AIRSHIP_DESERT
+
+    print("Airship desert", rg.nwcorner, rg.secorner)
+
+    return self.next_feature_todo()
 
 features_todo = [
     (coneria_candidates,),
@@ -753,6 +780,7 @@ features_todo = [
     (place_waterfall,),
     (mountain_candidates,"Volcano", VOLCANO),
     (mountain_candidates,"Ice cave", ICE_CAVE_STRUCTURE),
+    (airship_desert,)
 ]
 
 class PlacementState():
