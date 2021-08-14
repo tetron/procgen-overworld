@@ -584,11 +584,22 @@ def titan_west_candidates(self):
         attempts.append(functools.partial(self.copy().place_titan_west, region))
     return attempts
 
-def place_in_desert(self, name, feature):
+def place_in_desert(self, name, feature, require_canoe_access):
     regions = []
     for region in self.biome_regionlist:
-        if region.tile == DESERT_REGION:
-            regions.append(region)
+        if region.tile != DESERT_REGION:
+            continue
+        p = next(iter(region.points))
+        tr = self.traversable_regionmap[p[1]][p[0]]
+
+        if require_canoe_access and not (tr in self.reachable or
+                                         has_river_dock(self.traversable_regionlist[tr],
+                                                        self.traversable_regionlist)):
+            continue
+        elif not airship_accessible(self.traversable_regionlist[tr], self.tilemap, self.traversable_regionlist):
+            continue
+
+        regions.append(region)
 
     pc = place_in_random_region(self, regions, self.biome_regionmap, 0, feature)
 
@@ -598,6 +609,8 @@ def place_in_desert(self, name, feature):
     print("Placed", name, pc)
     if name == "MirageTower1":
         self.overworldCoordinates["MirageTower1"] = {"X": pc[0][0]+1, "Y": pc[0][1]+2}
+    if name == "Airship":
+        self.airship = pc[0]
 
     return self.next_feature_todo()
 
@@ -737,36 +750,36 @@ def mountain_candidates(self, name, feature, teleport):
     random.shuffle(c)
     return c
 
-def airship_desert(self):
-    regions = []
-    for region in self.biome_regionlist:
-        if region.tile != DESERT_REGION:
-            continue
-        p = next(iter(region.points))
-        tv = self.traversable_regionlist[self.traversable_regionmap[p[1]][p[0]]]
-        if tv.regionid in self.reachable:
-            regions.append(region)
-            continue
-        if has_river_dock(tv, self.traversable_regionlist):
-            regions.append(region)
-            continue
+# def airship_desert(self):
+#     regions = []
+#     for region in self.biome_regionlist:
+#         if region.tile != DESERT_REGION:
+#             continue
+#         p = next(iter(region.points))
+#         tv = self.traversable_regionlist[self.traversable_regionmap[p[1]][p[0]]]
+#         if tv.regionid in self.reachable:
+#             regions.append(region)
+#             continue
+#         if has_river_dock(tv, self.traversable_regionlist):
+#             regions.append(region)
+#             continue
 
-    if not regions:
-        return False
+#     if not regions:
+#         return False
 
-    random.shuffle(regions)
-    rg = regions.pop()
+#     random.shuffle(regions)
+#     rg = regions.pop()
 
-    pickpoint = []
-    for p in rg.points:
-        if self.tilemap[p[1]][p[0]] == DESERT:
-            self.tilemap[p[1]][p[0]] = AIRSHIP_DESERT
-            pickpoint.append(p)
+#     pickpoint = []
+#     for p in rg.points:
+#         if self.tilemap[p[1]][p[0]] == DESERT:
+#             self.tilemap[p[1]][p[0]] = AIRSHIP_DESERT
+#             pickpoint.append(p)
 
-    print("Airship desert", rg.nwcorner, rg.secorner)
-    self.airship = pickpoint[random.randrange(0, len(pickpoint))]
+#     print("Airship desert", rg.nwcorner, rg.secorner)
+#     self.airship = pickpoint[random.randrange(0, len(pickpoint))]
 
-    return self.next_feature_todo()
+#     return self.next_feature_todo()
 
 def place_ship_accessible_feature(self, name, tiles, biome, region, extra):
     if biome == "cave":
@@ -812,6 +825,7 @@ def place_earth_cave(self, name, tiles, biome, region, extra):
     self.dock_exclude.append(region.regionid)
 
     print("Placed", name, "at", pc, "region", region.regionid)
+    self.overworldCoordinates["EarthCave1"] = {"X": pc[0], "Y": pc[1]}
 
     return self.next_feature_todo()
 
@@ -821,8 +835,8 @@ features_todo = [
     (place_gaia,),
     (place_ordeals,),
     (titan_west_candidates,),
-    (place_in_desert, "MirageTower1", MIRAGE_TOWER),
-    (place_in_desert, "Caravan", OASIS),
+    (place_in_desert, "MirageTower1", MIRAGE_TOWER, False),
+    (place_in_desert, "Caravan", OASIS, False),
     (onrac_candidates,),
     (place_dock_accessible_feature, "EarthCave1", EARTH_CAVE, "cave", place_earth_cave),
     (place_dock_accessible_feature, "TitansTunnelEast", TITAN_CAVE_E, "cave",
@@ -850,8 +864,8 @@ features_todo = [
     (place_anywhere, "Cardia6", pit_cave_feature(CARDIA_5)),
     (place_waterfall,),
     (mountain_candidates,"GurguVolcano1", VOLCANO, (3, 2)),
-    (mountain_candidates,"IceCave1", ICE_CAVE_STRUCTURE, (2, 1)),
-    (airship_desert,)
+    (mountain_candidates,"IceCave1", ICE_CAVE_FEATURE, (2, 1)),
+    (place_in_desert, "Airship", AIRSHIP_FEATURE, True),
 ]
 
 class PlacementState():
@@ -897,10 +911,14 @@ class PlacementState():
         if pc is not False:
             print("placed ToF at", pc)
             self.overworldCoordinates["TempleOfFiends1"] = {"X": pc[0][0]+2, "Y": pc[0][1]+2}
-            if do_place_bridge:
-                return [functools.partial(self.copy().bridge_candidates, region)]
-            else:
-                return self.place_pravoka(region)
+
+            # coneria region gets a dock
+            pc = self.place_dock(region)
+            if pc is not False:
+                if do_place_bridge:
+                    return [functools.partial(self.copy().bridge_candidates, region)]
+                else:
+                    return self.place_pravoka(region)
         return False
 
     def bridge_candidates(self, coneria_region):
@@ -1018,6 +1036,7 @@ class PlacementState():
         self.overworldCoordinates["SardasCave"] = {"X": pc[0], "Y": pc[1]}
 
         self.dock_exclude.append(region.regionid)
+        self.reachable.append(region.regionid)
 
         return self.next_feature_todo()
 
@@ -1238,6 +1257,18 @@ def procgen():
     tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, post_shore_region_map))
     tilemap = apply_borders(tilemap)
 
+
+    # Exits
+    # 0 "Titan E"
+    # 1 "Titan W"
+    # 2 "Ice Cave"
+    # 3 "Castle Ordeals"
+    # 4 "Castle Coneria"
+    # 5 "Earth Cave",
+    # 6 "Gurgu Volcano"
+    # 7 "Sea Shrine"
+    # 8 "Sky Castle"
+
     saveffm(tilemap, "map5.ffm")
     with open("map5.json", "w") as f:
         json.dump({
@@ -1252,11 +1283,83 @@ def procgen():
 	    "ShipLocations": [
 		{
 		    "TeleporterIndex": 255,
-		    "X": finalstate.overworldCoordinates["Pravoka"]["X"]+3,
-		    "Y": finalstate.overworldCoordinates["Pravoka"]["Y"]+6
+		    "X": finalstate.overworldCoordinates["Pravoka"]["X"]+1,
+		    "Y": finalstate.overworldCoordinates["Pravoka"]["Y"]+3
 		}
 	    ],
 	    "TeleporterFixups": [
+                {
+                    "Type": 1,
+                    "Index": 0,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["TitansTunnelEast"]["X"],
+                        "Y": finalstate.overworldCoordinates["TitansTunnelEast"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 1,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["TitansTunnelWest"]["X"],
+                        "Y": finalstate.overworldCoordinates["TitansTunnelWest"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 2,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["IceCave1"]["X"],
+                        "Y": finalstate.overworldCoordinates["IceCave1"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 3,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["CastleOrdeals1"]["X"],
+                        "Y": finalstate.overworldCoordinates["CastleOrdeals1"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 4,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["ConeriaCastle1"]["X"],
+                        "Y": finalstate.overworldCoordinates["ConeriaCastle1"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 5,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["EarthCave1"]["X"],
+                        "Y": finalstate.overworldCoordinates["EarthCave1"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 6,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["GurguVolcano1"]["X"],
+                        "Y": finalstate.overworldCoordinates["GurguVolcano1"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 7,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["Onrac"]["X"],
+                        "Y": finalstate.overworldCoordinates["Onrac"]["Y"]
+                    }
+                },
+                {
+                    "Type": 1,
+                    "Index": 8,
+                    "To": {
+                        "X": finalstate.overworldCoordinates["MirageTower1"]["X"],
+                        "Y": finalstate.overworldCoordinates["MirageTower1"]["Y"]
+                    }
+                }
 	    ],
 	    "DomainFixups": [
 	    ],

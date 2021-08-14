@@ -164,9 +164,19 @@ W_CANAL_STRUCTURE = [
     [None,     None,   None,  None,  None,  None],
 ]
 
-ICE_CAVE_STRUCTURE = [
+ICE_CAVE_FEATURE = [
     [None, None, None, None, None],
     [None, None, ICE_CAVE, None, None],
     [None, GRASS, GRASS, GRASS, None],
     [None, GRASS, GRASS, GRASS, None],
+]
+
+AIRSHIP_FEATURE = [
+    [ None,   None,   None,           None,  None,   None, None],
+    [ None, None,  RIVER,          RIVER, RIVER,  None, None],
+    [ None, RIVER, RIVER, AIRSHIP_DESERT, RIVER, RIVER, None],
+    [ None, RIVER, AIRSHIP_DESERT, AIRSHIP_DESERT, AIRSHIP_DESERT, RIVER, None],
+    [ None, RIVER, RIVER, AIRSHIP_DESERT, RIVER, RIVER, None],
+    [ None,  None,  RIVER,          RIVER, RIVER,  None, None],
+    [ None,  None,           None,  None,   None, None],
 ]
