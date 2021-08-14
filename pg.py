@@ -845,9 +845,9 @@ features_todo = [
     (place_anywhere, "BahamutCave1", pit_cave_feature(BAHAMUTS_CAVE)),
     (place_anywhere, "Cardia1", pit_cave_feature(CARDIA_1)),
     (place_anywhere, "Cardia2", pit_cave_feature(CARDIA_2)),
-    (place_anywhere, "Cardia3", pit_cave_feature(CARDIA_3)),
-    (place_anywhere, "Cardia4", pit_cave_feature(CARDIA_4)),
-    (place_anywhere, "Cardia5", pit_cave_feature(CARDIA_5)),
+    (place_anywhere, "Cardia4", pit_cave_feature(CARDIA_3)),
+    (place_anywhere, "Cardia5", pit_cave_feature(CARDIA_4)),
+    (place_anywhere, "Cardia6", pit_cave_feature(CARDIA_5)),
     (place_waterfall,),
     (mountain_candidates,"GurguVolcano1", VOLCANO, (3, 2)),
     (mountain_candidates,"IceCave1", ICE_CAVE_STRUCTURE, (2, 1)),
@@ -931,7 +931,7 @@ class PlacementState():
 
         if self.bridge is not None:
             # Bridge location
-            #self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
+            self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
             print("placed bridge at", self.bridge)
             self.reachable.append(bridged_region.regionid)
             return [functools.partial(self.copy().place_pravoka, bridged_region)]
