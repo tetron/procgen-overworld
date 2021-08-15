@@ -471,6 +471,7 @@ def apply_shores(tilemap):
     tilemap = apply_filter(tilemap, apply_shores1, {"*": all_tiles, "_": non_water_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores2, {"*": all_tiles, "_": non_water_tiles}, False)
     tilemap = apply_filter(tilemap, apply_shores3, {"*": all_tiles, "_": non_ocean_shore_tiles}, False)
+    tilemap = apply_filter(tilemap, apply_shores4, {"*": all_tiles, "_": non_ocean_shore_tiles}, False)
 
     return tilemap
 
@@ -484,13 +485,14 @@ def apply_borders(tilemap):
                                              FOREST_E, FOREST_SW, FOREST_S, FOREST_SE])
     non_mountain_tiles = all_tiles.difference([MOUNTAIN, EARTH_CAVE, ICE_CAVE, DWARF_CAVE, MATOYAS_CAVE, SARDAS_CAVE, TITAN_CAVE_E, TITAN_CAVE_W])
     non_water_tiles = all_tiles.difference([OCEAN, RIVER, SHORE_N, SHORE_E, SHORE_S, SHORE_W])
+    pit_caves = [BAHAMUTS_CAVE, CARDIA_1, CARDIA_2, CARDIA_3, CARDIA_4, CARDIA_5]
 
     tilemap = apply_filter(tilemap, mountain_borders, {"_": non_mountain_tiles, "*": all_tiles}, False)
     tilemap = apply_filter(tilemap, river_borders, {"_": non_water_tiles,
                                                     "*": all_tiles},
                            False)
 
-    tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles}, False)
+    tilemap = apply_filter(tilemap, desert_borders, {"_": non_desert_tiles, "*": all_tiles, "C": pit_caves}, False)
     tilemap = apply_filter(tilemap, marsh_borders,  {"_": non_marsh_tiles, "*": all_tiles}, False)
     tilemap = apply_filter(tilemap, grass_borders,  {"_": non_grass_tiles, "*": all_tiles}, False)
     tilemap = apply_filter(tilemap, forest_borders, {"_": non_forest_tiles, "*": all_tiles}, False)
@@ -610,7 +612,7 @@ def place_in_desert(self, name, feature, require_canoe_access):
     if name == "MirageTower1":
         self.overworldCoordinates["MirageTower1"] = {"X": pc[0][0]+1, "Y": pc[0][1]+2}
     if name == "Airship":
-        self.airship = (pc[0]+4, pc[0]+3)
+        self.airship = (pc[0][0]+4, pc[0][1]+3)
 
     return self.next_feature_todo()
 
@@ -918,7 +920,7 @@ class PlacementState():
                 if do_place_bridge:
                     return [functools.partial(self.copy().bridge_candidates, region)]
                 else:
-                    return self.place_pravoka(region)
+                    return self.place_pravoka(region, True)
         return False
 
     def bridge_candidates(self, coneria_region):
@@ -952,19 +954,24 @@ class PlacementState():
             self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
             print("placed bridge at", self.bridge)
             self.reachable.append(bridged_region.regionid)
-            return [functools.partial(self.copy().place_pravoka, bridged_region)]
+            return [functools.partial(self.copy().place_pravoka, bridged_region, False)]
 
         return False
 
-    def place_pravoka(self, pravoka_region):
+    def place_pravoka(self, pravoka_region, moat):
         points = list(pravoka_region.points)
         random.shuffle(points)
         for p in points:
             x = p[0]
             y = p[1]
 
-            w = len(PRAVOKA_CITY[0])
-            h = len(PRAVOKA_CITY)
+            if moat:
+                feature = PRAVOKA_CITY_MOAT
+            else:
+                feature = PRAVOKA_CITY
+
+            w = len(feature[0])
+            h = len(feature)
 
             for c in ((-1, h-1, w-1),
                       (w,  h-1, 0),
@@ -972,9 +979,12 @@ class PlacementState():
                 c1 = self.traversable_regionmap[y+c[1]][x+c[0]]
                 if c1 == 0:
                     self.pravoka = place_feature_in_region(self, pravoka_region, self.traversable_regionmap,
-                                                           0, PRAVOKA_CITY, place_at=(p[0], p[1]))
+                                                           0, feature, place_at=(p[0], p[1]))
                     if self.pravoka is not False:
+                        if moat:
+                            self.bridge = (x+4, y)
                         self.tilemap[y+c[1]][x+c[2]] = LAND
+
                         print("Placed Pravoka at", self.pravoka)
                         self.overworldCoordinates["Pravoka"] = {"X": p[0]+2, "Y": p[1]+3}
                         return self.next_feature_todo()
@@ -1011,6 +1021,7 @@ class PlacementState():
                     if dock is not False:
                         # canal location
                         #self.tilemap[p[1]][p[0] + c[5]] = LAND
+                        self.canal = (p[0] + c[5], p[1])
 
                         print("placed a dock at", dock, "in region", region.regionid)
                         return True
@@ -1105,13 +1116,13 @@ def place_features(tilemap):
 
     walkable_count = len([t for t in traversable_regionlist if t.tile == WALKABLE_REGION])
     print("Walkable regions count", walkable_count)
-    if walkable_count < 15 or walkable_count > 40:
+    if walkable_count < 15 or walkable_count > 45:
         # too few regions or too many regions tend to fail
         return None
 
     pending = [PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
                               traversable_regionmap, traversable_regionlist, weightmap,
-                              features_todo).next_feature_todo]
+                              copy.copy(features_todo)).next_feature_todo]
 
     finalstate = None
     while pending:
@@ -1257,7 +1268,6 @@ def procgen():
     tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, post_shore_region_map))
     tilemap = apply_borders(tilemap)
 
-
     # Exits
     # 0 "Titan E"
     # 1 "Titan W"
@@ -1370,7 +1380,12 @@ def procgen():
 
     return True
 
-random.seed(125)
+import sys
+seed = random.randrange(0, sys.maxsize)
+random.seed(seed)
+print("Using seed", seed)
+#random.seed(125)
+random.seed(9066423674080091572)
 success = procgen()
-#while success is False:
-#success = procgen()
+while success is False:
+    success = procgen()

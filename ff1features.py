@@ -39,6 +39,19 @@ PRAVOKA_CITY = [
 ]
 
 
+PRAVOKA_CITY_MOAT = [
+    [None, None, None,         None,        None,         None, None, None, None, None, None],
+    [None, OCEAN, OCEAN,       OCEAN,              OCEAN,        OCEAN,              OCEAN,           OCEAN, OCEAN, OCEAN, None],
+    [None, OCEAN, None, None,         None,        None,         None, None, None, OCEAN, None],
+    [None, OCEAN, None, None, CITY_WALL_NW, CITY_WALL_N, CITY_WALL_NE, None, None, OCEAN, None],
+    [None, OCEAN, None, CITY_WALL_W1, CITY_WALL_W2, PRAVOKA, CITY_WALL_E2, CITY_WALL_E1, None, OCEAN, None],
+    [None, OCEAN, None, CITY_WALL_W3, PRAVOKA, CITY_PAVED, PRAVOKA, CITY_WALL_E3, None, OCEAN, None],
+    [None, OCEAN, None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None, OCEAN, None],
+    [None, OCEAN, None,          LAND,             DOCK_S,       DOCK_S,             DOCK_S,          LAND, None, OCEAN, None],
+    [OCEAN, OCEAN, OCEAN,       OCEAN,              OCEAN,        OCEAN,              OCEAN,           OCEAN, OCEAN, OCEAN, OCEAN]
+]
+
+
 ELFLAND_CASTLE = [
     [SMALL_CASTLE_TOP_W, SMALL_CASTLE_TOP_W],
     [ELFLAND_CASTLE_W, ELFLAND_CASTLE_E],

@@ -263,6 +263,25 @@ apply_shores3 = [
      SHORE_S],
 ]
 
+apply_shores4 = [
+    [["*", "*",   "*",
+      "*", OCEAN, "*",
+      "*", DOCK_S,  "*"],
+     SHORE_N],
+    [["*", "*",   "*",
+      "*", OCEAN, "*",
+      "*", DOCK_SE,  "*"],
+     SHORE_N],
+    [["*", "*",   "*",
+      "*", OCEAN, DOCK_E,
+      "*", "*",   "*"],
+     SHORE_W],
+    [["*",  "*",   "*",
+      DOCK_W, OCEAN, "*",
+      "*",  "*",   "*"],
+     SHORE_E],
+]
+
 mountain_borders = [
     [["*", "*",       "*",
       "*", MOUNTAIN,  "_",
@@ -329,6 +348,41 @@ river_borders = [
 ]
 
 desert_borders = [
+    [[   "*", DESERT, "*",
+      DESERT, DESERT, DESERT,
+         "*", DESERT, "C"],
+     DESERT_SE],
+
+    [["*",    DESERT, "*",
+      DESERT, DESERT, DESERT,
+         "*",     "C", "*"],
+     DESERT_SW],
+
+    [["*",    DESERT, "*",
+      DESERT, DESERT, "C",
+      "*",    DESERT, "*"],
+     DESERT_NE],
+
+    [["*",    DESERT, "*",
+      "C",    DESERT, DESERT,
+      "*",    DESERT, "*"],
+     DESERT_SW],
+
+    [["*",    DESERT, "*",
+      "C",    DESERT, DESERT,
+      "*",    DESERT, "*"],
+     DESERT_NW],
+
+    [["*",    "C",    "*",
+      DESERT, DESERT, DESERT,
+      "*",    DESERT, "*"],
+     DESERT_NE],
+
+    [["C",    DESERT, "*",
+      DESERT, DESERT, DESERT,
+      "*",    DESERT, "*"],
+     DESERT_NW],
+
     [["*", "_",   "*",
      "_", DESERT, DESERT,
      "*", DESERT,   "*"],
