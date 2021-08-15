@@ -610,7 +610,7 @@ def place_in_desert(self, name, feature, require_canoe_access):
     if name == "MirageTower1":
         self.overworldCoordinates["MirageTower1"] = {"X": pc[0][0]+1, "Y": pc[0][1]+2}
     if name == "Airship":
-        self.airship = pc[0]
+        self.airship = (pc[0]+4, pc[0]+3)
 
     return self.next_feature_todo()
 

@@ -172,11 +172,12 @@ ICE_CAVE_FEATURE = [
 ]
 
 AIRSHIP_FEATURE = [
-    [ None,   None,   None,           None,  None,   None, None],
-    [ None, None,  RIVER,          RIVER, RIVER,  None, None],
-    [ None, RIVER, RIVER, AIRSHIP_DESERT, RIVER, RIVER, None],
-    [ None, RIVER, AIRSHIP_DESERT, AIRSHIP_DESERT, AIRSHIP_DESERT, RIVER, None],
-    [ None, RIVER, RIVER, AIRSHIP_DESERT, RIVER, RIVER, None],
-    [ None,  None,  RIVER,          RIVER, RIVER,  None, None],
-    [ None,  None,           None,  None,   None, None],
+    [None,        None,      None,         None,           None,         None,        None,        None, None],
+    [None, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, None],
+    [None, MOUNTAIN,  MOUNTAIN,   MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, MOUNTAIN, None],
+    [None, MOUNTAIN, MOUNTAIN,  DESERT_NW,  AIRSHIP_DESERT, DESERT_NE, MOUNTAIN, MOUNTAIN, None],
+    [None, MOUNTAIN, MOUNTAIN,  DESERT_SW,  AIRSHIP_DESERT, DESERT_SE, MOUNTAIN, MOUNTAIN, None],
+    [None, MOUNTAIN, MOUNTAIN,  MOUNTAIN,  AIRSHIP_DESERT, MOUNTAIN, MOUNTAIN, MOUNTAIN, None],
+    [None, MOUNTAIN, MOUNTAIN,  MOUNTAIN,  AIRSHIP_DESERT, MOUNTAIN, MOUNTAIN, MOUNTAIN, None],
+    [None,        None,      None,         None,           None,         None,        None,        None],
 ]
