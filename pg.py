@@ -1268,6 +1268,11 @@ def procgen():
     tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, post_shore_region_map))
     tilemap = apply_borders(tilemap)
 
+    domains = []
+
+    for i in range(0, 64):
+        domains.append(10)
+
     # Exits
     # 0 "Titan E"
     # 1 "Titan W"
@@ -1379,8 +1384,8 @@ def procgen():
                     }
                 }
 	    ],
-	    "DomainFixups": [
-	    ],
+	    "DomainFixups": [],
+	    "DomainUpdates": [{"From": j, "To": i} for i,j in enumerate(domains)],
             "OverworldCoordinates": finalstate.overworldCoordinates
         }, f, indent=4)
 
