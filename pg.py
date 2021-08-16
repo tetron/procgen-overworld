@@ -951,7 +951,7 @@ class PlacementState():
 
         if self.bridge is not None:
             # Bridge location
-            self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
+            #self.tilemap[self.bridge[1]][self.bridge[0]] = DOCK_W
             print("placed bridge at", self.bridge)
             self.reachable.append(bridged_region.regionid)
             return [functools.partial(self.copy().place_pravoka, bridged_region, False)]
@@ -1290,6 +1290,14 @@ def procgen():
 		"X": finalstate.airship[0],
 		"Y": finalstate.airship[1]
 	    },
+            "BridgeLocation": {
+                "X": finalstate.bridge[0],
+                "Y": finalstate.bridge[1]
+            },
+            "CanalLocation": {
+                "X": finalstate.canal[0],
+                "Y": finalstate.canal[1]
+            },
 	    "ShipLocations": [
 		{
 		    "TeleporterIndex": 255,
@@ -1384,8 +1392,8 @@ import sys
 seed = random.randrange(0, sys.maxsize)
 random.seed(seed)
 print("Using seed", seed)
-#random.seed(125)
-random.seed(9066423674080091572)
+random.seed(125)
+#random.seed(9066423674080091572)
 success = procgen()
 while success is False:
     success = procgen()
