@@ -3,6 +3,7 @@ import math
 import json
 import functools
 import copy
+import collections
 import PIL.Image
 from ff1features import *
 from ff1filters import *
@@ -220,7 +221,7 @@ def find_regions(tilemap, tile_region_type):
     regionlist = [Region(tile_region_type[OCEAN], 0)]
 
     working_stack = [(0, 0, 0)]
-    pending = []
+    pending = collections.deque()
 
     while working_stack:
         while working_stack:
@@ -243,7 +244,7 @@ def find_regions(tilemap, tile_region_type):
                         pending.append((ab[0], ab[1], current_region))
 
         while pending and not working_stack:
-            x, y, current_region = pending.pop(0)
+            x, y, current_region = pending.popleft()
             if regionmap[y][x] is None:
                 regionlist.append(Region(tile_region_type[tilemap[y][x]], len(regionlist)))
                 next_region = len(regionlist)-1
@@ -832,7 +833,7 @@ def place_earth_cave(self, name, tiles, biome, region, extra):
     return self.next_feature_todo()
 
 
-features_todo = [
+features_todo = collections.deque([
     (coneria_candidates,),
     (place_gaia,),
     (place_ordeals,),
@@ -868,7 +869,7 @@ features_todo = [
     (mountain_candidates,"GurguVolcano1", VOLCANO, (3, 2)),
     (mountain_candidates,"IceCave1", ICE_CAVE_FEATURE, (2, 1)),
     (place_in_desert, "Airship", AIRSHIP_FEATURE, True),
-]
+])
 
 class PlacementState():
     def __init__(self, tilemap, biome_regionmap, biome_regionlist, traversable_regionmap, traversable_regionlist,
@@ -1101,7 +1102,7 @@ class PlacementState():
     def next_feature_todo(self):
         if len(self.features_todo) == 0:
             return self
-        next_todo = self.features_todo.pop(0)
+        next_todo = self.features_todo.popleft()
         return next_todo[0](self.copy(), *next_todo[1:])
 
 
@@ -1138,6 +1139,92 @@ def place_features(tilemap):
         return finalstate
 
     return None
+
+def assign_encounter_domains(state):
+    nearest_dungeon = []
+    for x in range(0, map_size):
+        nearest_dungeon.append([None] * map_size)
+
+    working_list = collections.deque()
+
+    for k,v, in state.overworldCoordinates.items():
+        working_list.append((v["X"], v["Y"], k))
+
+    while working_list:
+            x, y, dungeon = working_list.popleft()
+
+            if nearest_dungeon[y][x] is not None:
+                continue
+
+            nearest_dungeon[y][x] = dungeon
+
+            adjacent = [(x+1, y), (x, y+1), (x-1, y), (x, y-1)]
+            for ab in adjacent:
+                if ab[0] >= 0 and ab[0] <= (map_size-1) and ab[1] >= 0 and ab[1] <= (map_size-1):
+                    next_tile = traversable_region_map[state.tilemap[ab[1]][ab[0]]]
+                    if next_tile in (WALKABLE_REGION, CANOE_REGION):
+                        working_list.append((ab[0], ab[1], dungeon))
+
+    source_encounter_domains = {
+        "Coneria":         [0o54, 0o44],
+        "ConeriaCastle1":  [0o54, 0o44],
+        "TempleOfFiends1": [0o34],
+        "Pravoka":         [0o46, 0o47],
+        "Gaia":            [0o06],
+        "CastleOrdeals1":  [0o14, 0o05],
+        "TitansTunnelWest": [0o50],
+        "SardasCave": [0o50],
+        "MirageTower1": [0o16],
+        "Onrac": [0o11, 0o21],
+        "EarthCave1": [0o52],
+        "TitansTunnelEast": [0o50],
+        "MatoyasCave": [0o35, 0o45],
+        "DwarfCave": [0o43],
+        "Elfland": [0o64],
+        "ElflandCastle": [0o64],
+        "MarshCave1": [0o73],
+        "NorthwestCastle": [0o53],
+        "Melmond": [0o42, 0o52],
+        "CrescentLake": [0o66],
+        "Lefein": [0o37],
+        "BahamutCave1": [0o13],
+        "Cardia1": [0o12],
+        "Cardia2": [0o12],
+        "Cardia4": [0o12],
+        "Cardia5": [0o13],
+        "Cardia6": [0o13],
+        "Waterfall": [0o01],
+        "GurguVolcano1": [0o66],
+        "IceCave1": [0o66]
+    }
+
+    domains = []
+
+    for i in range(0, 8):
+        for j in range(0, 8):
+            counts = {}
+            for y in range(0, 32):
+                for x in range(0, 32):
+                    nd = nearest_dungeon[i*32 + y][j*32 + x]
+                    if nd is not None:
+                        counts[nd] = counts.get(nd, 0) + 1
+
+            pick = None
+            mx = 0
+            for k,v in counts.items():
+                if v > mx:
+                    pick = k
+                    mx = v
+            if pick is not None:
+                dm = source_encounter_domains[pick]
+                if len(dm) > 1:
+                    domains.append(dm[random.randrange(0, len(dm))])
+                else:
+                    domains.append(dm[0])
+            else:
+                domains.append(0)
+    print(domains)
+    return domains
 
 
 def procgen():
@@ -1261,17 +1348,14 @@ def procgen():
         return False
     tilemap = finalstate.tilemap
 
+    domains = assign_encounter_domains(finalstate)
+
     print("Applying borders")
     tilemap = apply_shores(tilemap)
 
     print("Removing salients")
     tilemap = apply_filter(tilemap, [None], None, True, matcher=functools.partial(check_salient, post_shore_region_map))
     tilemap = apply_borders(tilemap)
-
-    domains = []
-
-    for i in range(0, 64):
-        domains.append(10)
 
     # Exits
     # 0 "Titan E"
