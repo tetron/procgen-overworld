@@ -996,10 +996,10 @@ class PlacementState():
         points = list(region.points)
         random.shuffle(points)
         for p in points:
-            for c in ((-1, 0,  0, -1, W_DOCK_STRUCTURE),
-                      (0,  1, -1, 0,  S_DOCK_STRUCTURE),
-                      (1,  0, -2, -1, E_DOCK_STRUCTURE),
-                      (0, -1, -1, -2, N_DOCK_STRUCTURE),
+            for c in ((-1, 0,  0, -2, W_DOCK_STRUCTURE),
+                      (0,  1, -2, -2, S_DOCK_STRUCTURE),
+                      (1,  0, -3, -2, E_DOCK_STRUCTURE),
+                      (0, -1, -2,  0, N_DOCK_STRUCTURE),
             ):
                 if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
                     dock = place_feature_in_region(self, region, self.traversable_regionmap,

@@ -145,28 +145,32 @@ OASIS = [
 ]
 
 N_DOCK_STRUCTURE = [
-    [DOCK_E,  OCEAN, None],
-    [DOCK_E,  OCEAN, None],
-    [DOCK_E,  OCEAN, None],
+    [None, DOCK_E,  OCEAN, None],
+    [None, DOCK_E,  OCEAN, None],
+    [None, DOCK_E,  OCEAN, None],
+    [None,   None,   None, None],
 ]
 
 S_DOCK_STRUCTURE = [
-    [DOCK_S, DOCK_S, DOCK_S],
-    [OCEAN,   OCEAN,  OCEAN],
+    [  None, None,   None,   None,     None],
+    [  None, DOCK_SE, DOCK_S, DOCK_SW, None],
+    [  None, OCEAN,   OCEAN,  OCEAN,   None],
 ]
 
 W_DOCK_STRUCTURE = [
-    [DOCK_S, DOCK_S,  DOCK_SW],
-    [OCEAN,   OCEAN,  DOCK_W],
+    [   None,   None,   None,  None],
+    [DOCK_S, DOCK_S,  DOCK_SW, None],
+    [OCEAN,   OCEAN,  DOCK_W,  None],
 ]
 
 E_DOCK_STRUCTURE = [
-    [DOCK_SE, DOCK_S, DOCK_S],
-    [DOCK_E,   OCEAN,  OCEAN],
+    [   None, None,   None,   None],
+    [   None, DOCK_SE, DOCK_S, DOCK_S],
+    [   None, DOCK_E,   OCEAN,  OCEAN],
 ]
 
 E_CANAL_STRUCTURE = [
-    [DOCK_SE, DOCK_S, DOCK_S, None, None,    None],
+    [DOCK_SE, DOCK_S, DOCK_SW, None, None,    None],
     [DOCK_E,   OCEAN,  OCEAN, OCEAN, OCEAN, OCEAN],
     [None,     None,   None,  None,  None,  None],
 ]
