@@ -884,6 +884,7 @@ class PlacementState():
         self.airship = None
         self.bridge = None
         self.canal = None
+        self.ship = None
         self.reachable = []
         self.dock_exclude = []
         self.features_todo = features_todo
@@ -983,8 +984,9 @@ class PlacementState():
                                                            0, feature, place_at=(p[0], p[1]))
                     if self.pravoka is not False:
                         if moat:
-                            self.bridge = (x+4, y)
+                            self.bridge = (x+5, y+1)
                         self.tilemap[y+c[1]][x+c[2]] = LAND
+                        self.ship = (x + w//2, y + (h-1))
 
                         print("Placed Pravoka at", self.pravoka)
                         self.overworldCoordinates["Pravoka"] = {"X": p[0]+2, "Y": p[1]+3}
@@ -1390,8 +1392,8 @@ def procgen():
 	    "ShipLocations": [
 		{
 		    "TeleporterIndex": 255,
-		    "X": finalstate.overworldCoordinates["Pravoka"]["X"]+1,
-		    "Y": finalstate.overworldCoordinates["Pravoka"]["Y"]+3
+		    "X": finalstate.ship[0],
+		    "Y": finalstate.ship[1]
 		}
 	    ],
 	    "TeleporterFixups": [
@@ -1481,8 +1483,12 @@ import sys
 seed = random.randrange(0, sys.maxsize)
 random.seed(seed)
 print("Using seed", seed)
-random.seed(125)
+#random.seed(125)
 #random.seed(9066423674080091572)
+
+random.seed(3954109794112501611)  # epic quest
+#random.seed(7264102721263510500)   # archipelago
+
 success = procgen()
 while success is False:
     success = procgen()
