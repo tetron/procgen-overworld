@@ -183,22 +183,42 @@ connect_diagonals = [
 apply_shores1 = [
     [["*", "*",   "*",
       "*", OCEAN, "_",
-      "*", "_",  "*"],
-     SHORE_NW],
+      "*", "_",  MOUNTAIN],
+     OCEAN],
 
     [["*", "*",    "*",
       "_", OCEAN, "*",
+      MOUNTAIN, "_",   "*"],
+     OCEAN],
+
+    [[MOUNTAIN,  "_",  "*",
+      "_", OCEAN, "*",
+      "*",  "*",   "*"],
+     OCEAN],
+
+    [["*", "_",    MOUNTAIN,
+      "*", OCEAN,  "_",
+      "*",  "*",   "*"],
+     OCEAN],
+
+    [["*",   OCEAN,   "*",
+      OCEAN, OCEAN, "_",
+      "*",      "_",  "*"],
+     SHORE_NW],
+
+    [["*", OCEAN,    "*",
+      "_", OCEAN, OCEAN,
       "*", "_",   "*"],
      SHORE_NE],
 
     [["*",  "_",  "*",
-      "_", OCEAN, "*",
-      "*",  "*",   "*"],
+      "_", OCEAN, OCEAN,
+      "*", OCEAN,   "*"],
      SHORE_SE],
 
-    [["*", "_",   "*",
-      "*", OCEAN,  "_",
-      "*",  "*",   "*"],
+    [["*",     "_",  "*",
+      OCEAN, OCEAN,  "_",
+      "*",   OCEAN,  "*"],
      SHORE_SW],
 ]
 
@@ -383,6 +403,28 @@ desert_borders = [
       "*",    DESERT, "*"],
      DESERT_NW],
 
+
+    [["*",   "_",  "*",
+      "_", DESERT,  "_",
+      "*", DESERT,  "*"],
+     LAND],
+
+    [["*",  "_",   "*",
+      "_", DESERT, DESERT,
+      "*",  "_",   "*"],
+     LAND],
+
+    [["*", DESERT, "*",
+      "_", DESERT, "_",
+      "*",  "_",  "*"],
+     LAND],
+
+    [["*",   "_",   "*",
+      DESERT, DESERT, "_",
+      "*",   "_",   "*"],
+     LAND],
+
+
     [["*", "_",   "*",
      "_", DESERT, DESERT,
      "*", DESERT,   "*"],
@@ -427,6 +469,27 @@ marsh_borders = [
 ]
 
 grass_borders = [
+    [["*",   "_",  "*",
+      "_", GRASS,  "_",
+      "*", GRASS,  "*"],
+     LAND],
+
+    [["*",  "_",   "*",
+      "_", GRASS, GRASS,
+      "*",  "_",   "*"],
+     LAND],
+
+    [["*", GRASS, "*",
+      "_", GRASS, "_",
+      "*",  "_",  "*"],
+     LAND],
+
+    [["*",   "_",   "*",
+      GRASS, GRASS, "_",
+      "*",   "_",   "*"],
+     LAND],
+
+
     [["*", "_",   "*",
      "_", GRASS, GRASS,
      "*", GRASS,   "*"],

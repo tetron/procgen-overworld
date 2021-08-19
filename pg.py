@@ -508,6 +508,24 @@ def airship_accessible(region, tilemap, regionlist, checked=None):
     checked.append(region.regionid)
     for p in region.points:
         if tilemap[p[1]][p[0]] in (LAND, GRASS):
+            ocean_tiles = 0
+            for c in ((-1, 0),
+                      (0, 1),
+                      (1, 0),
+                      (0, 1)):
+                if tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
+                    ocean_tiles += 1
+            if ocean_tiles >= 2:
+                # Corner tiles sometimes get turned in shore tiles
+                # which cannot be landed on, so as a special case
+                # ensure that there's at least one adjacent tile to
+                # this one that can also be landed on.
+                for c in ((-1, 0),
+                          (0, 1),
+                          (1, 0),
+                          (0, 1)):
+                    if tilemap[p[1]+c[1]][p[0]+c[0]] in (DESERT, FOREST, MARSH):
+                        tilemap[p[1]+c[1]][p[0]+c[0]] = tilemap[p[1]][p[0]]
             return True
     for adj in region.adjacent:
         if regionlist[adj].tile == CANOE_REGION:
@@ -1225,7 +1243,6 @@ def assign_encounter_domains(state):
                     domains.append(dm[0])
             else:
                 domains.append(0)
-    print(domains)
     return domains
 
 
@@ -1483,11 +1500,19 @@ import sys
 seed = random.randrange(0, sys.maxsize)
 random.seed(seed)
 print("Using seed", seed)
-#random.seed(125)
+#random.seed(125)     # Chanel 125
 #random.seed(9066423674080091572)
 
-random.seed(3954109794112501611)  # epic quest
-#random.seed(7264102721263510500)   # archipelago
+#random.seed(3954109794112501611)  # epic quest
+random.seed(7264102721263510500)   # archipelago
+
+# TODO:
+#
+# * Make sure islands that are airship accessible are still airship
+#   accessible after applying shores
+#
+# * Make sure regions that are not walkable (ocean-mountain corner)
+#  don't become walkable when applying shores
 
 success = procgen()
 while success is False:
