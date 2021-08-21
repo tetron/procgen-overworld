@@ -368,39 +368,39 @@ river_borders = [
 ]
 
 desert_borders = [
-    [[   "*", DESERT, "*",
-      DESERT, DESERT, DESERT,
+    [[   "*", "*", "*",
+         "*", DESERT, DESERT,
          "*", DESERT, "C"],
      DESERT_SE],
 
-    [["*",    DESERT, "*",
+    [["*",    "*", "*",
       DESERT, DESERT, DESERT,
          "*",     "C", "*"],
      DESERT_SW],
 
     [["*",    DESERT, "*",
-      DESERT, DESERT, "C",
+      "*",    DESERT, "C",
       "*",    DESERT, "*"],
      DESERT_NE],
 
     [["*",    DESERT, "*",
-      "C",    DESERT, DESERT,
+      "C",    DESERT, "*",
       "*",    DESERT, "*"],
      DESERT_SW],
 
     [["*",    DESERT, "*",
-      "C",    DESERT, DESERT,
+      "C",    DESERT, "*",
       "*",    DESERT, "*"],
      DESERT_NW],
 
     [["*",    "C",    "*",
       DESERT, DESERT, DESERT,
-      "*",    DESERT, "*"],
+      "*",    "*", "*"],
      DESERT_NE],
 
     [["C",    DESERT, "*",
-      DESERT, DESERT, DESERT,
-      "*",    DESERT, "*"],
+      DESERT, DESERT, "*",
+      "*",    "*", "*"],
      DESERT_NW],
 
 

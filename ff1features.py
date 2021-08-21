@@ -48,6 +48,7 @@ PRAVOKA_CITY_MOAT = [
     [None, OCEAN, None, CITY_WALL_W3, PRAVOKA, CITY_PAVED, PRAVOKA, CITY_WALL_E3, None, OCEAN, None],
     [None, OCEAN, None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None, OCEAN, None],
     [None, OCEAN, None,          LAND,             DOCK_S,       DOCK_S,             DOCK_S,          LAND, None, OCEAN, None],
+    [OCEAN, OCEAN, OCEAN,       OCEAN,              OCEAN,        OCEAN,              OCEAN,           OCEAN, OCEAN, OCEAN, OCEAN],
     [OCEAN, OCEAN, OCEAN,       OCEAN,              OCEAN,        OCEAN,              OCEAN,           OCEAN, OCEAN, OCEAN, OCEAN]
 ]
 
@@ -97,10 +98,12 @@ ONRAC_TOWN = [
 ]
 
 LEFEIN_CITY = [
+    [None,          None,             None,       None,             None,          None, None],
     [None, None, CITY_WALL_NW, CITY_WALL_N, CITY_WALL_NE, None, None],
     [None, CITY_WALL_W1, CITY_WALL_W2, LEFEIN, CITY_WALL_E2, CITY_WALL_E1, None],
     [None, CITY_WALL_W3, LEFEIN, LEFEIN, LEFEIN, CITY_WALL_E3, None],
     [None, CITY_WALL_SW1, CITY_WALL_GATE_W, CITY_PAVED, CITY_WALL_GATE_E, CITY_WALL_SE1, None],
+    [None,          None,             None,       None,             None,          None, None],
 ]
 
 CRESCENT_LAKE_CITY = [

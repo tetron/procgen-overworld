@@ -285,7 +285,9 @@ def remove_small_islands(tilemap, regionlist):
 
     random.shuffle(candidates)
 
-    for r in candidates[:len(candidates)-4]:
+    number_to_keep = 6
+
+    for r in candidates[:max(0, len(candidates)-number_to_keep)]:
         for p in r.points:
             tilemap[p[1]][p[0]] = OCEAN
 
@@ -360,7 +362,7 @@ def check_fit(regionmap, r, x, y, h, w):
             break
     return fits
 
-def place_feature_in_region(self, r, regionmap, maxweight, feature, place_at=None):
+def place_feature_in_region(self, r, regionmap, weightmap, maxweight, feature, place_at=None):
     h = len(feature)
     w = len(feature[0])
 
@@ -378,7 +380,7 @@ def place_feature_in_region(self, r, regionmap, maxweight, feature, place_at=Non
         weight = 0
         while candidate is None and weight < maxweight:
             for p in points:
-                if self.weightmap[p[1]+(h//2)][p[0]+(w//2)] > weight:
+                if weightmap[p[1]+(h//2)][p[0]+(w//2)] > weight:
                     continue
                 if check_fit(regionmap, r, p[0], p[1], h, w):
                     candidate = p
@@ -388,7 +390,7 @@ def place_feature_in_region(self, r, regionmap, maxweight, feature, place_at=Non
     if not candidate:
         return False
 
-    render_feature(self.tilemap, self.weightmap, feature, candidate[0], candidate[1])
+    render_feature(self.tilemap, weightmap, feature, candidate[0], candidate[1])
     fix_regionmap(self.traversable_regionmap, feature, candidate[0], candidate[1], -1)
     fix_regionmap(self.biome_regionmap, feature, candidate[0], candidate[1], -1)
     return candidate
@@ -500,7 +502,28 @@ def apply_borders(tilemap):
 
     return tilemap
 
-def airship_accessible(region, tilemap, regionlist, checked=None):
+def ensure_airship_accessible(tilemap, p):
+    ocean_tiles = 0
+    for c in ((-1, 0),
+              (0, 1),
+              (1, 0),
+              (0, 1)):
+        if tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
+            ocean_tiles += 1
+    if ocean_tiles >= 2:
+        # Corner tiles sometimes get turned in shore tiles
+        # which cannot be landed on, so as a special case
+        # ensure that there's at least one adjacent tile to
+        # this one that can also be landed on.
+        for c in ((-1, 0),
+                  (0, 1),
+                  (1, 0),
+                  (0, 1)):
+            if tilemap[p[1]+c[1]][p[0]+c[0]] in (DESERT, FOREST, MARSH):
+                print("Turning", (p[0]+c[0], p[1]+c[1]), "from", tilemap[p[1]][p[0]], "to", tilemap[p[1]+c[1]][p[0]+c[0]])
+                tilemap[p[1]+c[1]][p[0]+c[0]] = tilemap[p[1]][p[0]]
+
+def airship_accessible(region, tilemap, regionlist, access_points, checked=None):
     if checked is None:
         checked = []
     if region.regionid in checked:
@@ -508,30 +531,14 @@ def airship_accessible(region, tilemap, regionlist, checked=None):
     checked.append(region.regionid)
     for p in region.points:
         if tilemap[p[1]][p[0]] in (LAND, GRASS):
-            ocean_tiles = 0
-            for c in ((-1, 0),
-                      (0, 1),
-                      (1, 0),
-                      (0, 1)):
-                if tilemap[p[1]+c[1]][p[0]+c[0]] == OCEAN:
-                    ocean_tiles += 1
-            if ocean_tiles >= 2:
-                # Corner tiles sometimes get turned in shore tiles
-                # which cannot be landed on, so as a special case
-                # ensure that there's at least one adjacent tile to
-                # this one that can also be landed on.
-                for c in ((-1, 0),
-                          (0, 1),
-                          (1, 0),
-                          (0, 1)):
-                    if tilemap[p[1]+c[1]][p[0]+c[0]] in (DESERT, FOREST, MARSH):
-                        tilemap[p[1]+c[1]][p[0]+c[0]] = tilemap[p[1]][p[0]]
-            return True
+            access_points[region.regionid] = p
+            return p
     for adj in region.adjacent:
         if regionlist[adj].tile == CANOE_REGION:
-            if airship_accessible(regionlist[adj], tilemap, regionlist, checked):
-                return True
-
+            p = airship_accessible(regionlist[adj], tilemap, regionlist, access_points, checked)
+            if p is not False:
+                access_points[region.regionid] = p
+                return p
     return False
 
 def pit_cave_feature(cave):
@@ -556,7 +563,7 @@ def get_subregions(region, other_regionmap):
 def place_in_random_region(self, subregions, biome_regionmap, weight, feature):
     random.shuffle(subregions)
     for sr in subregions:
-        loc = place_feature_in_region(self, sr, biome_regionmap, weight, feature)
+        loc = place_feature_in_region(self, sr, biome_regionmap, self.weightmap, weight, feature)
         if loc is not False:
             return (loc, sr.regionid)
     return False
@@ -607,17 +614,19 @@ def titan_west_candidates(self):
 
 def place_in_desert(self, name, feature, require_canoe_access):
     regions = []
+    access_points = {}
     for region in self.biome_regionlist:
         if region.tile != DESERT_REGION:
             continue
         p = next(iter(region.points))
         tr = self.traversable_regionmap[p[1]][p[0]]
 
-        if require_canoe_access and not (tr in self.reachable or
-                                         has_river_dock(self.traversable_regionlist[tr],
-                                                        self.traversable_regionlist)):
-            continue
-        elif not airship_accessible(self.traversable_regionlist[tr], self.tilemap, self.traversable_regionlist):
+        if require_canoe_access:
+            if not (tr in self.reachable or
+                    has_river_dock(self.traversable_regionlist[tr],
+                                   self.traversable_regionlist)):
+                continue
+        elif not airship_accessible(self.traversable_regionlist[tr], self.tilemap, self.traversable_regionlist, access_points):
             continue
 
         regions.append(region)
@@ -626,6 +635,13 @@ def place_in_desert(self, name, feature, require_canoe_access):
 
     if pc is False:
         return False
+
+    if not require_canoe_access:
+        region = self.biome_regionlist[pc[1]]
+        p = next(iter(region.points))
+        while self.traversable_regionmap[p[1]][p[0]] == -1:
+            p = next(iter(region.points))
+        ensure_airship_accessible(self.tilemap, access_points[self.traversable_regionmap[p[1]][p[0]]])
 
     print("Placed", name, pc)
     if name == "MirageTower1":
@@ -663,19 +679,34 @@ def has_river_dock(region, regionlist, checked=None):
                 return True
     return False
 
-def place_anywhere(self, name, feature):
-    regions = []
+def place_anywhere(self, name, feature, prefer_islands):
+    access_points = {}
+
+    islands = []
+    other_regions = []
+
     for rg in self.traversable_regionlist:
         if rg.tile != WALKABLE_REGION:
             continue
-        if not airship_accessible(rg, self.tilemap, self.traversable_regionlist):
+        if not airship_accessible(rg, self.tilemap, self.traversable_regionlist, access_points):
             continue
-        regions.append(rg)
+        if prefer_islands and len(rg.adjacent) == 1 and 0 in rg.adjacent:
+            islands.append(rg)
+        else:
+            other_regions.append(rg)
 
-    pc = place_in_random_region(self, regions, self.traversable_regionmap, 0, feature)
+    #print("islands", [r.regionid for r in islands])
+    #print("other_regions", [r.regionid for r in other_regions])
+
+    pc = place_in_random_region(self, islands, self.traversable_regionmap, 0, feature)
+
+    if pc is False:
+        pc = place_in_random_region(self, other_regions, self.traversable_regionmap, 0, feature)
 
     if pc is False:
         return False
+
+    ensure_airship_accessible(self.tilemap, access_points[pc[1]])
 
     print("Placed", name, pc)
     if name == "Lefein":
@@ -734,6 +765,7 @@ def place_ordeals(self):
 
 def place_waterfall(self):
     regions = []
+    access_points = {}
     for rg in self.traversable_regionlist:
         if rg.tile != CANOE_REGION:
             continue
@@ -742,9 +774,11 @@ def place_waterfall(self):
             accessible = True
         else:
             for adj in rg.adjacent:
-                if (self.traversable_regionlist[adj].tile == WALKABLE_REGION and
-                    airship_accessible(self.traversable_regionlist[adj], self.tilemap, self.traversable_regionlist)):
-                    accessible = True
+                if self.traversable_regionlist[adj].tile == WALKABLE_REGION:
+                    aa = airship_accessible(self.traversable_regionlist[adj], self.tilemap, self.traversable_regionlist, access_points)
+                    if aa is not False:
+                        access_points[rg.regionid] = aa
+                        accessible = True
         if not accessible:
             continue
         regions.append(rg)
@@ -758,9 +792,16 @@ def place_waterfall(self):
                 and self.tilemap[p[1]-1][p[0]] == RIVER
                 and self.tilemap[p[1]+1][p[0]] == RIVER):
                 pc = place_feature_in_region(self, rg, self.traversable_regionmap,
-                                             0, [[WATERFALL]], place_at=(p[0], p[1]))
+                                             self.weightmap, 0, [[WATERFALL]],
+                                             place_at=(p[0], p[1]))
+                if pc is False:
+                    continue
                 print("Placed waterfall",pc)
                 self.overworldCoordinates["Waterfall"] = {"X": p[0], "Y": p[1]}
+
+                if rg.regionid in access_points:
+                    ensure_airship_accessible(self.tilemap, access_points[rg.regionid])
+
                 return self.next_feature_todo()
     return False
 
@@ -876,28 +917,29 @@ features_todo = collections.deque([
      place_ship_accessible_feature, (1, 1)),
     (place_dock_accessible_feature, "CrescentLake", CRESCENT_LAKE_CITY, (LAND_REGION, GRASS_REGION, FOREST_REGION, MARSH_REGION),
      place_ship_accessible_feature, (2, 5)),
-    (place_anywhere, "Lefein", LEFEIN_CITY),
-    (place_anywhere, "BahamutCave1", pit_cave_feature(BAHAMUTS_CAVE)),
-    (place_anywhere, "Cardia1", pit_cave_feature(CARDIA_1)),
-    (place_anywhere, "Cardia2", pit_cave_feature(CARDIA_2)),
-    (place_anywhere, "Cardia4", pit_cave_feature(CARDIA_3)),
-    (place_anywhere, "Cardia5", pit_cave_feature(CARDIA_4)),
-    (place_anywhere, "Cardia6", pit_cave_feature(CARDIA_5)),
+    (place_in_desert, "Airship", AIRSHIP_FEATURE, True),
     (place_waterfall,),
     (mountain_candidates,"GurguVolcano1", VOLCANO, (3, 2)),
     (mountain_candidates,"IceCave1", ICE_CAVE_FEATURE, (2, 1)),
-    (place_in_desert, "Airship", AIRSHIP_FEATURE, True),
+    (place_anywhere, "Lefein", LEFEIN_CITY, False),
+    (place_anywhere, "BahamutCave1", pit_cave_feature(BAHAMUTS_CAVE), True),
+    (place_anywhere, "Cardia1", pit_cave_feature(CARDIA_1), True),
+    (place_anywhere, "Cardia2", pit_cave_feature(CARDIA_2), True),
+    (place_anywhere, "Cardia4", pit_cave_feature(CARDIA_3), True),
+    (place_anywhere, "Cardia5", pit_cave_feature(CARDIA_4), True),
+    (place_anywhere, "Cardia6", pit_cave_feature(CARDIA_5), True),
 ])
 
 class PlacementState():
     def __init__(self, tilemap, biome_regionmap, biome_regionlist, traversable_regionmap, traversable_regionlist,
-                 weightmap, features_todo):
+                 weightmap, dock_weightmap, features_todo):
         self.tilemap = tilemap
         self.biome_regionmap = biome_regionmap
         self.biome_regionlist = biome_regionlist
         self.traversable_regionmap = traversable_regionmap
         self.traversable_regionlist = traversable_regionlist
         self.weightmap = weightmap
+        self.dock_weightmap = dock_weightmap
         self.overworldCoordinates = {}
         self.airship = None
         self.bridge = None
@@ -913,6 +955,7 @@ class PlacementState():
         c.reachable = copy.copy(c.reachable)
         c.dock_exclude = copy.copy(c.dock_exclude)
         c.weightmap = copy.deepcopy(c.weightmap)
+        c.dock_weightmap = copy.deepcopy(c.dock_weightmap)
         c.features_todo = copy.copy(c.features_todo)
         c.overworldCoordinates = copy.copy(c.overworldCoordinates)
         return c
@@ -996,15 +1039,18 @@ class PlacementState():
             for c in ((-1, h-1, w-1),
                       (w,  h-1, 0),
             ):
+                if y+c[1] >= map_size or x+c[0] >= map_size:
+                    continue
                 c1 = self.traversable_regionmap[y+c[1]][x+c[0]]
                 if c1 == 0:
                     self.pravoka = place_feature_in_region(self, pravoka_region, self.traversable_regionmap,
-                                                           0, feature, place_at=(p[0], p[1]))
+                                                           self.weightmap, 0, feature, place_at=(p[0], p[1]))
                     if self.pravoka is not False:
                         if moat:
                             self.bridge = (x+5, y+1)
-                        self.tilemap[y+c[1]][x+c[2]] = LAND
-                        self.ship = (x + w//2, y + (h-1))
+                        self.tilemap[y+h-1][x+c[2]] = LAND
+                        self.tilemap[y+h-2][x+c[2]] = LAND
+                        self.ship = (x + w//2, y + (h-2))
 
                         print("Placed Pravoka at", self.pravoka)
                         self.overworldCoordinates["Pravoka"] = {"X": p[0]+2, "Y": p[1]+3}
@@ -1015,18 +1061,24 @@ class PlacementState():
     def place_dock(self, region):
         points = list(region.points)
         random.shuffle(points)
-        for p in points:
-            for c in ((-1, 0,  0, -2, W_DOCK_STRUCTURE),
-                      (0,  1, -2, -2, S_DOCK_STRUCTURE),
-                      (1,  0, -3, -2, E_DOCK_STRUCTURE),
-                      (0, -1, -2,  0, N_DOCK_STRUCTURE),
-            ):
-                if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
-                    dock = place_feature_in_region(self, region, self.traversable_regionmap,
-                                                   0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
-                    if dock is not False:
-                        print("placed a dock at", dock, "in region", region.regionid)
-                        return True
+        weight = 0
+        while weight < 20:
+            for p in points:
+                for c in ((-1, 0,  0, -2, W_DOCK_STRUCTURE),
+                          (0,  1, -2, -2, S_DOCK_STRUCTURE),
+                          (1,  0, -3, -2, E_DOCK_STRUCTURE),
+                          (0, -1, -2,  0, N_DOCK_STRUCTURE),
+                ):
+                    if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0 and self.dock_weightmap[p[1]+c[1]][p[0]+c[0]] <= weight:
+                        dock = place_feature_in_region(self, region, self.traversable_regionmap,
+                                                       self.dock_weightmap, weight, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
+                        if dock is not False:
+                            print("placed a dock at", dock, "in region", region.regionid)
+                            return True
+            if region.regionid in self.reachable:
+                print("Skipped extra dock in reachable region", region.regionid)
+                return True
+            weight += 1
         return False
 
     def place_canal(self, region):
@@ -1038,7 +1090,7 @@ class PlacementState():
             ):
                 if self.traversable_regionmap[p[1]+c[1]][p[0]+c[0]] == 0:
                     dock = place_feature_in_region(self, region, self.traversable_regionmap,
-                                                   0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
+                                                   self.weightmap, 0, c[4], place_at=(p[0]+c[2], p[1]+c[3]))
                     if dock is not False:
                         # canal location
                         #self.tilemap[p[1]][p[0] + c[5]] = LAND
@@ -1088,7 +1140,7 @@ class PlacementState():
                 if sample.tile != CANOE_REGION:
                     continue
                 pc = place_feature_in_region(self, region, self.biome_regionmap,
-                                               0, feature, place_at=(x, y))
+                                               self.weightmap, 0, feature, place_at=(x, y))
                 if pc is not False:
                     print("Placed", name, pc)
                     self.overworldCoordinates[name] = {"X": p[0]+teleport[0], "Y": p[1]+teleport[1]}
@@ -1108,10 +1160,13 @@ class PlacementState():
                 continue
 
             pc = place_feature_in_region(self, region, self.traversable_regionmap,
-                                         0, ONRAC_TOWN, place_at=(x, y))
+                                         self.weightmap, 0, ONRAC_TOWN, place_at=(x, y))
 
-            if not airship_accessible(region, self.tilemap, self.traversable_regionlist):
+            aa = airship_accessible(region, self.tilemap, self.traversable_regionlist, {})
+            if aa is False:
                 return False
+
+            ensure_airship_accessible(self.tilemap, aa)
 
             if pc is not False:
                 print("Placed Onrac at", pc)
@@ -1135,6 +1190,10 @@ def place_features(tilemap):
     for x in range(0, map_size):
         weightmap.append([0] * map_size)
 
+    dock_weightmap = []
+    for x in range(0, map_size):
+        dock_weightmap.append([0] * map_size)
+
     walkable_count = len([t for t in traversable_regionlist if t.tile == WALKABLE_REGION])
     print("Walkable regions count", walkable_count)
     if walkable_count < 15 or walkable_count > 45:
@@ -1143,10 +1202,13 @@ def place_features(tilemap):
 
     pending = [PlacementState(dup_tilemap(tilemap), biome_regionmap, biome_regionlist,
                               traversable_regionmap, traversable_regionlist, weightmap,
+                              dock_weightmap,
                               copy.copy(features_todo)).next_feature_todo]
 
     finalstate = None
+    attempts = 0
     while pending:
+        attempts += 1
         p = pending.pop()
         r = p()
         if isinstance(r, PlacementState):
@@ -1154,6 +1216,8 @@ def place_features(tilemap):
             break
         if r is not False:
             pending.extend(r)
+        if attempts % 20 == 0:
+            print("att", attempts)
 
     if finalstate is not None:
         return finalstate
@@ -1498,21 +1562,13 @@ def procgen():
 
 import sys
 seed = random.randrange(0, sys.maxsize)
-random.seed(seed)
+
+#seed = 125     # Chanel 125
+#seed = 3954109794112501611  # epic quest
+#seed = 7264102721263510500   # archipelago
+
 print("Using seed", seed)
-#random.seed(125)     # Chanel 125
-#random.seed(9066423674080091572)
-
-#random.seed(3954109794112501611)  # epic quest
-random.seed(7264102721263510500)   # archipelago
-
-# TODO:
-#
-# * Make sure islands that are airship accessible are still airship
-#   accessible after applying shores
-#
-# * Make sure regions that are not walkable (ocean-mountain corner)
-#  don't become walkable when applying shores
+random.seed(seed)
 
 success = procgen()
 while success is False:
