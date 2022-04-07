@@ -1218,6 +1218,9 @@ def place_features(tilemap):
             pending.extend(r)
         if attempts % 20 == 0:
             print("att", attempts)
+            if attempts > 1000:
+                print("Giving up")
+                return None
 
     if finalstate is not None:
         return finalstate
