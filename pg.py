@@ -1563,16 +1563,16 @@ def procgen():
 
     return True
 
-import sys
-seed = random.randrange(0, sys.maxsize)
+# import sys
+# seed = random.randrange(0, sys.maxsize)
 
-#seed = 125     # Chanel 125
-#seed = 3954109794112501611  # epic quest
-#seed = 7264102721263510500   # archipelago
+# #seed = 125     # Chanel 125
+# #seed = 3954109794112501611  # epic quest
+# #seed = 7264102721263510500   # archipelago
 
-print("Using seed", seed)
-random.seed(seed)
+# print("Using seed", seed)
+# random.seed(seed)
 
-success = procgen()
-while success is False:
-    success = procgen()
+# success = procgen()
+# while success is False:
+#     success = procgen()
